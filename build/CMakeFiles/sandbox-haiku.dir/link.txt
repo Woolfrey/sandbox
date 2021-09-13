@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.o  -o sandbox-haiku 

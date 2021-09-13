@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/woolfrey/workspace/sandbox/src/position_control.cpp
+cmath
+-
+iostream
+-
+string
+-
+yarp/dev/ControlBoardInterfaces.h
+-
+yarp/dev/PolyDriver.h
+-
+yarp/os/Bottle.h
+-
+yarp/os/Network.h
+-
+yarp/os/Property.h
+-
+yarp/os/RpcServer.h
+-
+yarp/sig/Vector.h
+-
+
