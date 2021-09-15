@@ -111,6 +111,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named sandbox-dual_position_control
+
+# Build rule for target.
+sandbox-dual_position_control: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-dual_position_control
+.PHONY : sandbox-dual_position_control
+
+# fast build rule for target.
+sandbox-dual_position_control/fast:
+	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/build
+.PHONY : sandbox-dual_position_control/fast
+
+#=============================================================================
 # Target rules for targets named sandbox-position_control
 
 # Build rule for target.
@@ -190,6 +203,33 @@ src/position_control.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-position_control.dir/build.make CMakeFiles/sandbox-position_control.dir/src/position_control.cpp.s
 .PHONY : src/position_control.cpp.s
 
+src/position_control2.o: src/position_control2.cpp.o
+
+.PHONY : src/position_control2.o
+
+# target to build an object file
+src/position_control2.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.o
+.PHONY : src/position_control2.cpp.o
+
+src/position_control2.i: src/position_control2.cpp.i
+
+.PHONY : src/position_control2.i
+
+# target to preprocess a source file
+src/position_control2.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.i
+.PHONY : src/position_control2.cpp.i
+
+src/position_control2.s: src/position_control2.cpp.s
+
+.PHONY : src/position_control2.s
+
+# target to generate assembly for a file
+src/position_control2.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.s
+.PHONY : src/position_control2.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -198,6 +238,7 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... sandbox-dual_position_control"
 	@echo "... sandbox-position_control"
 	@echo "... sandbox-haiku"
 	@echo "... src/haiku.o"
@@ -206,6 +247,9 @@ help:
 	@echo "... src/position_control.o"
 	@echo "... src/position_control.i"
 	@echo "... src/position_control.s"
+	@echo "... src/position_control2.o"
+	@echo "... src/position_control2.i"
+	@echo "... src/position_control2.s"
 .PHONY : help
 
 

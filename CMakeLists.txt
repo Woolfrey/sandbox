@@ -7,7 +7,10 @@ find_package(YARP 3.3.0 REQUIRED)
 # A simple poem in haiku format
 add_executable(${PROJECT_NAME}-haiku src/haiku.cpp)
 
-
-# Joint controller
+# Single arm position controller
 add_executable(${PROJECT_NAME}-position_control src/position_control.cpp)
 target_link_libraries(${PROJECT_NAME}-position_control ${YARP_LIBRARIES})
+
+# Dual arm position controller
+add_executable(${PROJECT_NAME}-dual_position_control src/position_control2.cpp)
+target_link_libraries(${PROJECT_NAME}-dual_position_control ${YARP_LIBRARIES})

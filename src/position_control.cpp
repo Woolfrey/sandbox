@@ -16,6 +16,12 @@ int n;
 yarp::sig::Vector joint_position;					// Joint position information
 yarp::sig::Vector target;
 
+bool configureArmControl(yarp::dev::IEncoders &enc, yarp::dev::IPositionControl &controller)
+{
+
+	return true;
+}
+
 void getEncoderValues(yarp::dev::IEncoders &enc, yarp::sig::Vector &storage)
 {
 	//yarp::os::LogStream yInfo() << "Retrieving encoder information...";
@@ -71,12 +77,11 @@ int main(int argc, char *argv[])
 	yarp::os::Network yarp;					// Set up YARP
 	
 	// Configure communication
-	yarp::os::RpcServer port;					// Create a port with a Bottle object as the input
+	yarp::os::RpcServer port;					// Create a port for sending and receiving information
 	port.open("/command");						// Open the port with the name /command
 	yarp::os::Bottle input;					// Store information from user input
 	yarp::os::Bottle output;					// Store information to send to user
 	std::string answer;						// Response message
-	
 	
 	
 	// Configure the robot
@@ -93,7 +98,6 @@ int main(int argc, char *argv[])
  	}
  	
  	
- 	
  	// Configure controller
  	yarp::dev::IPositionControl *controller;			// Requires a pointer?
  	if(!robotDevice.view(controller));// yarp::os::Network yError() << "Problems acquiring controller interface.";
@@ -107,7 +111,6 @@ int main(int argc, char *argv[])
  		temp[i] = 80;						// Acceleration (deg/s^2)
  	}		
  	controller->setRefAccelerations(temp.data());			// Set reference accelerations (deg/s^2) (WHY LIKE THIS?)
- 	
  	
  	
  	// Configure encoder information
@@ -143,8 +146,6 @@ int main(int argc, char *argv[])
 		
 		else if(command == "home")
 		{
-			//getEncoderValues(*encoders, joint_position);			// Get current joint values
-			//target = joint_position;					// This ensures current values are maintained
 			home(target, *controller);					// Move to home position
 			output.addString("A casa");
 		}
@@ -164,8 +165,6 @@ int main(int argc, char *argv[])
 		// Extend both arms
 		else if(command == "receive")
 		{
-			//getEncoderValues(*encoders, joint_position);
-			//target = joint_position;
 			receive(target, *controller);
 			output.addString("Grazie");
 		}
@@ -174,8 +173,6 @@ int main(int argc, char *argv[])
 		// Extend one arm
 		else if(command == "shake")
 		{
-			//getEncoderValues(*encoders, joint_position);
-			//target = joint_position;
 			shake(target, *controller);
 			output.addString("Piacere");
 		}
@@ -184,8 +181,6 @@ int main(int argc, char *argv[])
 		// Wave one arm
 		else if(command == "wave")
 		{
-			//getEncoderValues(*encoders, joint_position);
-			//target = joint_position;
 			wave(target, *controller);
 			output.addString("Ciao");
 		}
