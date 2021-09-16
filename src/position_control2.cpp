@@ -65,8 +65,8 @@ bool configureControl(yarp::dev::PolyDriver &driver, yarp::dev::IPositionControl
 		
 		for(int i = 0; i < n; i++)
 		{
-			controller->setRefSpeed(i,50.0);		// Max speed (deg/s) for position controller
-			temp[i] = 100.0;				// (deg/s^2);
+			controller->setRefSpeed(i,20.0);		// Max speed (deg/s) for position controller
+			temp[i] = 50.0;				// (deg/s^2);
 		}
 		controller->setRefAccelerations(temp.data());		// WHY LIKE THIS?
 		
@@ -127,58 +127,41 @@ void shake(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 
 void wave(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 {
-	setpoint[0] =  -30.0;
-	setpoint[1] =   50.0;
-	setpoint[2] =  -60.0;
-	setpoint[3] =  100.0;
-	setpoint[4] =   30.0;
-	control.positionMove(setpoint.data());			// Move to home position
+
+	for(int i = 0; i < 5; i++)
+	{
+		if(i%2)						// If i is exactly divisible by 2
+		{
+			setpoint[0] =  -30.0;
+			setpoint[1] =   50.0;
+			setpoint[2] =  -60.0;
+			setpoint[3] =   70.0;
+			setpoint[4] =   30.0;
+		}
+		else
+		{
+			setpoint[0] =  -30.0;
+			setpoint[1] =   50.0;
+			setpoint[2] =  -60.0;
+			setpoint[3] =  120.0;
+			setpoint[4] =   30.0;
+		}
+		
+		control.positionMove(setpoint.data());
+		
+		if(i == 0) 	yarp::os::Time::delay(1.0);
+		else		yarp::os::Time::delay(0.5);
+	}
+	
+	yarp::os::Time::delay(0.5);
+	
+	home(setpoint, control);
 }
 
 int main(int argc, char *argv[])
 {
 	yarp::os::Network yarp;					// Set up YARP
 
-	/******************************** This bock of code works! *************************************************/
-	/* Configure right arm
-	yarp::os::Property options;
-	options.put("device", "remote_controlboard");
-	options.put("local", "/client/right");				// Local port names
-	options.put("remote", "/icubSim/right_arm");			// Where we want to connect to
-	yarp::dev::PolyDriver driver;
-	driver.open(options);
-	if(!driver.isValid())					
-	{
-		// yError() << "Message.";
-		
-		std::printf("Device not available. Here are the known devices:\n");		// Inform user
-		std::printf("%s", yarp::dev::Drivers::factory().toString().c_str());	
-		return 0;									// Shut down
-	}			
-	
-	// Configure left arm driver
-	options.put("device", "remote_controlboard");
-	options.put("local", "/client/left");				// Local port names
-	options.put("remote", "/icubSim/left_arm");			// Where we want to connect to
-	yarp::dev::PolyDriver driver2;
-	driver2.open(options);
-	if(!driver2.isValid())					
-	{
-		// yError() << "Message.";
-		
-		std::printf("Device not available. Here are the known devices:\n");		// Inform user
-		std::printf("%s", yarp::dev::Drivers::factory().toString().c_str());	
-		return 0;									// Shut down
-	}			
-	else
-	{
-		// yInfo() << "Message";
-		
-		return 1;
-	} */
-	/************************************************************************************************************/
-	
-	
 	// Configure the left arm
 	std::string local = "/local/left";
 	std::string remote = "/icubSim/left_arm";
@@ -245,6 +228,19 @@ int main(int argc, char *argv[])
 			home(left_target, *left_control);
 			home(right_target, *right_control);
 			output.addString("aCasa");
+		}
+		
+		// Read the joint positions from the encoders
+		else if(command == "read right")
+		{
+			getEncoderValues(*right_encoder, right_position);
+			int n;
+			right_encoder->getAxes(&n);
+			
+			for(int i = 0; i < n; i++)
+			{
+				
+			}
 		}
 		
 		// Extend arms to receive an object		
