@@ -78,6 +78,8 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
+  "CMakeFiles/sandbox-logging.dir/DependInfo.cmake"
+  "CMakeFiles/sandbox-velocity_control.dir/DependInfo.cmake"
   "CMakeFiles/sandbox-dual_position_control.dir/DependInfo.cmake"
   "CMakeFiles/sandbox-position_control.dir/DependInfo.cmake"
   "CMakeFiles/sandbox-haiku.dir/DependInfo.cmake"

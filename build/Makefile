@@ -111,6 +111,32 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named sandbox-logging
+
+# Build rule for target.
+sandbox-logging: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-logging
+.PHONY : sandbox-logging
+
+# fast build rule for target.
+sandbox-logging/fast:
+	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/build
+.PHONY : sandbox-logging/fast
+
+#=============================================================================
+# Target rules for targets named sandbox-velocity_control
+
+# Build rule for target.
+sandbox-velocity_control: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-velocity_control
+.PHONY : sandbox-velocity_control
+
+# fast build rule for target.
+sandbox-velocity_control/fast:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/build
+.PHONY : sandbox-velocity_control/fast
+
+#=============================================================================
 # Target rules for targets named sandbox-dual_position_control
 
 # Build rule for target.
@@ -176,6 +202,33 @@ src/haiku.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.s
 .PHONY : src/haiku.cpp.s
 
+src/logging.o: src/logging.cpp.o
+
+.PHONY : src/logging.o
+
+# target to build an object file
+src/logging.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.o
+.PHONY : src/logging.cpp.o
+
+src/logging.i: src/logging.cpp.i
+
+.PHONY : src/logging.i
+
+# target to preprocess a source file
+src/logging.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.i
+.PHONY : src/logging.cpp.i
+
+src/logging.s: src/logging.cpp.s
+
+.PHONY : src/logging.s
+
+# target to generate assembly for a file
+src/logging.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.s
+.PHONY : src/logging.cpp.s
+
 src/position_control.o: src/position_control.cpp.o
 
 .PHONY : src/position_control.o
@@ -230,6 +283,33 @@ src/position_control2.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.s
 .PHONY : src/position_control2.cpp.s
 
+src/velocity_control.o: src/velocity_control.cpp.o
+
+.PHONY : src/velocity_control.o
+
+# target to build an object file
+src/velocity_control.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.o
+.PHONY : src/velocity_control.cpp.o
+
+src/velocity_control.i: src/velocity_control.cpp.i
+
+.PHONY : src/velocity_control.i
+
+# target to preprocess a source file
+src/velocity_control.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.i
+.PHONY : src/velocity_control.cpp.i
+
+src/velocity_control.s: src/velocity_control.cpp.s
+
+.PHONY : src/velocity_control.s
+
+# target to generate assembly for a file
+src/velocity_control.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.s
+.PHONY : src/velocity_control.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -238,18 +318,26 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... sandbox-logging"
+	@echo "... sandbox-velocity_control"
 	@echo "... sandbox-dual_position_control"
 	@echo "... sandbox-position_control"
 	@echo "... sandbox-haiku"
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
+	@echo "... src/logging.o"
+	@echo "... src/logging.i"
+	@echo "... src/logging.s"
 	@echo "... src/position_control.o"
 	@echo "... src/position_control.i"
 	@echo "... src/position_control.s"
 	@echo "... src/position_control2.o"
 	@echo "... src/position_control2.i"
 	@echo "... src/position_control2.s"
+	@echo "... src/velocity_control.o"
+	@echo "... src/velocity_control.i"
+	@echo "... src/velocity_control.s"
 .PHONY : help
 
 

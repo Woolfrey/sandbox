@@ -1,5 +1,7 @@
 /home/woolfrey/workspace/sandbox/build/CMakeFiles/rebuild_cache.dir
 /home/woolfrey/workspace/sandbox/build/CMakeFiles/edit_cache.dir
+/home/woolfrey/workspace/sandbox/build/CMakeFiles/sandbox-logging.dir
+/home/woolfrey/workspace/sandbox/build/CMakeFiles/sandbox-velocity_control.dir
 /home/woolfrey/workspace/sandbox/build/CMakeFiles/sandbox-dual_position_control.dir
 /home/woolfrey/workspace/sandbox/build/CMakeFiles/sandbox-position_control.dir
 /home/woolfrey/workspace/sandbox/build/CMakeFiles/sandbox-haiku.dir

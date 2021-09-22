@@ -14,3 +14,11 @@ target_link_libraries(${PROJECT_NAME}-position_control ${YARP_LIBRARIES})
 # Dual arm position controller
 add_executable(${PROJECT_NAME}-dual_position_control src/position_control2.cpp)
 target_link_libraries(${PROJECT_NAME}-dual_position_control ${YARP_LIBRARIES})
+
+# Joint level velocity control
+add_executable(${PROJECT_NAME}-velocity_control src/velocity_control.cpp)
+target_link_libraries(${PROJECT_NAME}-velocity_control ${YARP_LIBRARIES})
+
+# Testing the logging functions
+add_executable(${PROJECT_NAME}-logging src/logging.cpp)
+target_link_libraries(${PROJECT_NAME}-logging ${YARP_LIBRARIES})
