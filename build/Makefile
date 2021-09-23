@@ -111,17 +111,30 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named sandbox-logging
+# Target rules for targets named sandbox-dual_velocity_control
 
 # Build rule for target.
-sandbox-logging: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-logging
-.PHONY : sandbox-logging
+sandbox-dual_velocity_control: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-dual_velocity_control
+.PHONY : sandbox-dual_velocity_control
 
 # fast build rule for target.
-sandbox-logging/fast:
-	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/build
-.PHONY : sandbox-logging/fast
+sandbox-dual_velocity_control/fast:
+	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/build
+.PHONY : sandbox-dual_velocity_control/fast
+
+#=============================================================================
+# Target rules for targets named sandbox-velocity_control2
+
+# Build rule for target.
+sandbox-velocity_control2: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-velocity_control2
+.PHONY : sandbox-velocity_control2
+
+# fast build rule for target.
+sandbox-velocity_control2/fast:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/build
+.PHONY : sandbox-velocity_control2/fast
 
 #=============================================================================
 # Target rules for targets named sandbox-velocity_control
@@ -201,33 +214,6 @@ src/haiku.s: src/haiku.cpp.s
 src/haiku.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.s
 .PHONY : src/haiku.cpp.s
-
-src/logging.o: src/logging.cpp.o
-
-.PHONY : src/logging.o
-
-# target to build an object file
-src/logging.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.o
-.PHONY : src/logging.cpp.o
-
-src/logging.i: src/logging.cpp.i
-
-.PHONY : src/logging.i
-
-# target to preprocess a source file
-src/logging.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.i
-.PHONY : src/logging.cpp.i
-
-src/logging.s: src/logging.cpp.s
-
-.PHONY : src/logging.s
-
-# target to generate assembly for a file
-src/logging.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-logging.dir/build.make CMakeFiles/sandbox-logging.dir/src/logging.cpp.s
-.PHONY : src/logging.cpp.s
 
 src/position_control.o: src/position_control.cpp.o
 
@@ -310,6 +296,60 @@ src/velocity_control.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.s
 .PHONY : src/velocity_control.cpp.s
 
+src/velocity_control2.o: src/velocity_control2.cpp.o
+
+.PHONY : src/velocity_control2.o
+
+# target to build an object file
+src/velocity_control2.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.o
+.PHONY : src/velocity_control2.cpp.o
+
+src/velocity_control2.i: src/velocity_control2.cpp.i
+
+.PHONY : src/velocity_control2.i
+
+# target to preprocess a source file
+src/velocity_control2.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.i
+.PHONY : src/velocity_control2.cpp.i
+
+src/velocity_control2.s: src/velocity_control2.cpp.s
+
+.PHONY : src/velocity_control2.s
+
+# target to generate assembly for a file
+src/velocity_control2.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.s
+.PHONY : src/velocity_control2.cpp.s
+
+src/velocity_control3.o: src/velocity_control3.cpp.o
+
+.PHONY : src/velocity_control3.o
+
+# target to build an object file
+src/velocity_control3.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.o
+.PHONY : src/velocity_control3.cpp.o
+
+src/velocity_control3.i: src/velocity_control3.cpp.i
+
+.PHONY : src/velocity_control3.i
+
+# target to preprocess a source file
+src/velocity_control3.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.i
+.PHONY : src/velocity_control3.cpp.i
+
+src/velocity_control3.s: src/velocity_control3.cpp.s
+
+.PHONY : src/velocity_control3.s
+
+# target to generate assembly for a file
+src/velocity_control3.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.s
+.PHONY : src/velocity_control3.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -318,7 +358,8 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... sandbox-logging"
+	@echo "... sandbox-dual_velocity_control"
+	@echo "... sandbox-velocity_control2"
 	@echo "... sandbox-velocity_control"
 	@echo "... sandbox-dual_position_control"
 	@echo "... sandbox-position_control"
@@ -326,9 +367,6 @@ help:
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
-	@echo "... src/logging.o"
-	@echo "... src/logging.i"
-	@echo "... src/logging.s"
 	@echo "... src/position_control.o"
 	@echo "... src/position_control.i"
 	@echo "... src/position_control.s"
@@ -338,6 +376,12 @@ help:
 	@echo "... src/velocity_control.o"
 	@echo "... src/velocity_control.i"
 	@echo "... src/velocity_control.s"
+	@echo "... src/velocity_control2.o"
+	@echo "... src/velocity_control2.i"
+	@echo "... src/velocity_control2.s"
+	@echo "... src/velocity_control3.o"
+	@echo "... src/velocity_control3.i"
+	@echo "... src/velocity_control3.s"
 .PHONY : help
 
 

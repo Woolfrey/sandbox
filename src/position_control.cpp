@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 			
 			for(int i = 0; i < n; i++)
 			{
-				output.addDouble(round(joint_position[i]));		// Return rounded values
+				output.addDouble(joint_position[i]);		// Return rounded values
 			}
 		}
 		

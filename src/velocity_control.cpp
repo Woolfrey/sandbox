@@ -178,6 +178,8 @@ bool configureControl(yarp::dev::PolyDriver &driver, yarp::dev::IVelocityControl
 		return 1;
 	}
 }
+
+
 bool configureDriver(yarp::dev::PolyDriver &driver, std::string &local, std::string &remote)
 {
 	yarp::os::Property options;

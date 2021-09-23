@@ -19,6 +19,10 @@ target_link_libraries(${PROJECT_NAME}-dual_position_control ${YARP_LIBRARIES})
 add_executable(${PROJECT_NAME}-velocity_control src/velocity_control.cpp)
 target_link_libraries(${PROJECT_NAME}-velocity_control ${YARP_LIBRARIES})
 
-# Testing the logging functions
-add_executable(${PROJECT_NAME}-logging src/logging.cpp)
-target_link_libraries(${PROJECT_NAME}-logging ${YARP_LIBRARIES})
+# Custom joint velocity control
+add_executable(${PROJECT_NAME}-velocity_control2 src/velocity_control2.cpp)
+target_link_libraries(${PROJECT_NAME}-velocity_control2 ${YARP_LIBRARIES})
+
+# Dual arm velocity control
+add_executable(${PROJECT_NAME}-dual_velocity_control src/velocity_control3.cpp)
+target_link_libraries(${PROJECT_NAME}-dual_velocity_control ${YARP_LIBRARIES})
