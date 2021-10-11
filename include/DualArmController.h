@@ -1,0 +1,7 @@
+
+class DualArmController
+{
+	private:
+	
+	public:
+}
