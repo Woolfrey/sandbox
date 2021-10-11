@@ -111,69 +111,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named sandbox-dual_velocity_control
+# Target rules for targets named sandbox-cartesian_control
 
 # Build rule for target.
-sandbox-dual_velocity_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-dual_velocity_control
-.PHONY : sandbox-dual_velocity_control
+sandbox-cartesian_control: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-cartesian_control
+.PHONY : sandbox-cartesian_control
 
 # fast build rule for target.
-sandbox-dual_velocity_control/fast:
-	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/build
-.PHONY : sandbox-dual_velocity_control/fast
-
-#=============================================================================
-# Target rules for targets named sandbox-velocity_control2
-
-# Build rule for target.
-sandbox-velocity_control2: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-velocity_control2
-.PHONY : sandbox-velocity_control2
-
-# fast build rule for target.
-sandbox-velocity_control2/fast:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/build
-.PHONY : sandbox-velocity_control2/fast
-
-#=============================================================================
-# Target rules for targets named sandbox-velocity_control
-
-# Build rule for target.
-sandbox-velocity_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-velocity_control
-.PHONY : sandbox-velocity_control
-
-# fast build rule for target.
-sandbox-velocity_control/fast:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/build
-.PHONY : sandbox-velocity_control/fast
-
-#=============================================================================
-# Target rules for targets named sandbox-dual_position_control
-
-# Build rule for target.
-sandbox-dual_position_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-dual_position_control
-.PHONY : sandbox-dual_position_control
-
-# fast build rule for target.
-sandbox-dual_position_control/fast:
-	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/build
-.PHONY : sandbox-dual_position_control/fast
-
-#=============================================================================
-# Target rules for targets named sandbox-position_control
-
-# Build rule for target.
-sandbox-position_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-position_control
-.PHONY : sandbox-position_control
-
-# fast build rule for target.
-sandbox-position_control/fast:
-	$(MAKE) -f CMakeFiles/sandbox-position_control.dir/build.make CMakeFiles/sandbox-position_control.dir/build
-.PHONY : sandbox-position_control/fast
+sandbox-cartesian_control/fast:
+	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/build
+.PHONY : sandbox-cartesian_control/fast
 
 #=============================================================================
 # Target rules for targets named sandbox-haiku
@@ -187,6 +135,33 @@ sandbox-haiku: cmake_check_build_system
 sandbox-haiku/fast:
 	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/build
 .PHONY : sandbox-haiku/fast
+
+src/cartesian_control.o: src/cartesian_control.cpp.o
+
+.PHONY : src/cartesian_control.o
+
+# target to build an object file
+src/cartesian_control.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o
+.PHONY : src/cartesian_control.cpp.o
+
+src/cartesian_control.i: src/cartesian_control.cpp.i
+
+.PHONY : src/cartesian_control.i
+
+# target to preprocess a source file
+src/cartesian_control.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.i
+.PHONY : src/cartesian_control.cpp.i
+
+src/cartesian_control.s: src/cartesian_control.cpp.s
+
+.PHONY : src/cartesian_control.s
+
+# target to generate assembly for a file
+src/cartesian_control.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.s
+.PHONY : src/cartesian_control.cpp.s
 
 src/haiku.o: src/haiku.cpp.o
 
@@ -215,141 +190,6 @@ src/haiku.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.s
 .PHONY : src/haiku.cpp.s
 
-src/position_control.o: src/position_control.cpp.o
-
-.PHONY : src/position_control.o
-
-# target to build an object file
-src/position_control.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-position_control.dir/build.make CMakeFiles/sandbox-position_control.dir/src/position_control.cpp.o
-.PHONY : src/position_control.cpp.o
-
-src/position_control.i: src/position_control.cpp.i
-
-.PHONY : src/position_control.i
-
-# target to preprocess a source file
-src/position_control.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-position_control.dir/build.make CMakeFiles/sandbox-position_control.dir/src/position_control.cpp.i
-.PHONY : src/position_control.cpp.i
-
-src/position_control.s: src/position_control.cpp.s
-
-.PHONY : src/position_control.s
-
-# target to generate assembly for a file
-src/position_control.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-position_control.dir/build.make CMakeFiles/sandbox-position_control.dir/src/position_control.cpp.s
-.PHONY : src/position_control.cpp.s
-
-src/position_control2.o: src/position_control2.cpp.o
-
-.PHONY : src/position_control2.o
-
-# target to build an object file
-src/position_control2.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.o
-.PHONY : src/position_control2.cpp.o
-
-src/position_control2.i: src/position_control2.cpp.i
-
-.PHONY : src/position_control2.i
-
-# target to preprocess a source file
-src/position_control2.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.i
-.PHONY : src/position_control2.cpp.i
-
-src/position_control2.s: src/position_control2.cpp.s
-
-.PHONY : src/position_control2.s
-
-# target to generate assembly for a file
-src/position_control2.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-dual_position_control.dir/build.make CMakeFiles/sandbox-dual_position_control.dir/src/position_control2.cpp.s
-.PHONY : src/position_control2.cpp.s
-
-src/velocity_control.o: src/velocity_control.cpp.o
-
-.PHONY : src/velocity_control.o
-
-# target to build an object file
-src/velocity_control.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.o
-.PHONY : src/velocity_control.cpp.o
-
-src/velocity_control.i: src/velocity_control.cpp.i
-
-.PHONY : src/velocity_control.i
-
-# target to preprocess a source file
-src/velocity_control.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.i
-.PHONY : src/velocity_control.cpp.i
-
-src/velocity_control.s: src/velocity_control.cpp.s
-
-.PHONY : src/velocity_control.s
-
-# target to generate assembly for a file
-src/velocity_control.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control.dir/build.make CMakeFiles/sandbox-velocity_control.dir/src/velocity_control.cpp.s
-.PHONY : src/velocity_control.cpp.s
-
-src/velocity_control2.o: src/velocity_control2.cpp.o
-
-.PHONY : src/velocity_control2.o
-
-# target to build an object file
-src/velocity_control2.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.o
-.PHONY : src/velocity_control2.cpp.o
-
-src/velocity_control2.i: src/velocity_control2.cpp.i
-
-.PHONY : src/velocity_control2.i
-
-# target to preprocess a source file
-src/velocity_control2.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.i
-.PHONY : src/velocity_control2.cpp.i
-
-src/velocity_control2.s: src/velocity_control2.cpp.s
-
-.PHONY : src/velocity_control2.s
-
-# target to generate assembly for a file
-src/velocity_control2.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-velocity_control2.dir/build.make CMakeFiles/sandbox-velocity_control2.dir/src/velocity_control2.cpp.s
-.PHONY : src/velocity_control2.cpp.s
-
-src/velocity_control3.o: src/velocity_control3.cpp.o
-
-.PHONY : src/velocity_control3.o
-
-# target to build an object file
-src/velocity_control3.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.o
-.PHONY : src/velocity_control3.cpp.o
-
-src/velocity_control3.i: src/velocity_control3.cpp.i
-
-.PHONY : src/velocity_control3.i
-
-# target to preprocess a source file
-src/velocity_control3.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.i
-.PHONY : src/velocity_control3.cpp.i
-
-src/velocity_control3.s: src/velocity_control3.cpp.s
-
-.PHONY : src/velocity_control3.s
-
-# target to generate assembly for a file
-src/velocity_control3.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-dual_velocity_control.dir/build.make CMakeFiles/sandbox-dual_velocity_control.dir/src/velocity_control3.cpp.s
-.PHONY : src/velocity_control3.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -358,30 +198,14 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... sandbox-dual_velocity_control"
-	@echo "... sandbox-velocity_control2"
-	@echo "... sandbox-velocity_control"
-	@echo "... sandbox-dual_position_control"
-	@echo "... sandbox-position_control"
+	@echo "... sandbox-cartesian_control"
 	@echo "... sandbox-haiku"
+	@echo "... src/cartesian_control.o"
+	@echo "... src/cartesian_control.i"
+	@echo "... src/cartesian_control.s"
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
-	@echo "... src/position_control.o"
-	@echo "... src/position_control.i"
-	@echo "... src/position_control.s"
-	@echo "... src/position_control2.o"
-	@echo "... src/position_control2.i"
-	@echo "... src/position_control2.s"
-	@echo "... src/velocity_control.o"
-	@echo "... src/velocity_control.i"
-	@echo "... src/velocity_control.s"
-	@echo "... src/velocity_control2.o"
-	@echo "... src/velocity_control2.i"
-	@echo "... src/velocity_control2.s"
-	@echo "... src/velocity_control3.o"
-	@echo "... src/velocity_control3.i"
-	@echo "... src/velocity_control3.s"
 .PHONY : help
 
 
