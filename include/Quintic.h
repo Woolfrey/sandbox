@@ -21,7 +21,7 @@ class Quintic
 				yarp::sig::Vector &acc,
 				const float &time);
 				
-		/*void get_state(yarp::sig::Vector &_axisAngle,			// Get the desired rotation as axis-angle
+		/*void get_state(yarp::sig::Vector &_axisAngle,		// Get the desired rotation as axis-angle
 				yarp::sig::Vector &vel,
 				yarp::sig::Vector &acc,
 				const float &time);*/
@@ -202,48 +202,3 @@ void Quintic::compute_coefficients()
 	this->b = -15*pow(dt,-4);
 	this->c =  10*pow(dt,-3);
 }
-
-
-/******************** Get the desired rotation ********************
-void Quintic::get_state(yarp::sig::Vector &_axisAngle,
-			yarp::sig::Vector &vel,
-			yarp::sig::Vector &acc,
-			const float &time)
-{
-	compute_scalars(time);							// Get the interpolation scalars for the given time
-	
-	_axisAngle[3] = this->s*this->axisAngle[3];				// Interpolate the angle
-	
-	for(int i = 0; i < 3; i++)
-	{
-		_axisAngle[i]	= this->axisAngle[i];				// Axis remains unchanged, but convenient to return it here
-		vel[i]       	= this->sd*this->axis[i];			// Angular velocity
-		acc[i]       	= this->sdd*this->axis[i];			// Angular acceleration
-	}
-}
-
-
-/******************** Compute interpolation coefficients at the given time ********************
-void Quintic::compute_scalars(const float &time)
-{
-	if(time < this->t1)							// Not yet started, remain at the start
-	{
-		this->s   = 0.0;
-		this->sd  = 0.0;
-		this->sdd = 0.0;
-	}
-	else if(time <= this->t2)						// Somewhere inbetween
-	{
-		float dt = time - this->t1;					// Time since start
-		
-		this->s   =    this->a*pow(dt,5) +    this->b*pow(dt,4) +   this->c*pow(dt,3);
-		this->sd  =  5*this->a*pow(dt,4) +  4*this->b*pow(dt,3) + 3*this->c*pow(dt,2);
-		this->sdd = 20*this->a*pow(dt,3) + 12*this->b*pow(dt,2) + 6*this->c;
-	}
-	else									// Finished, remain at the end
-	{
-		this->s   = 1.0;
-		this->sd  = 0.0;
-		this->sdd = 0.0;
-	}
-}*/

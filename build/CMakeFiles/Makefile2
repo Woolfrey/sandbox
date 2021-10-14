@@ -55,19 +55,40 @@ CMAKE_BINARY_DIR = /home/woolfrey/workspace/sandbox/build
 # The main recursive "all" target.
 all: CMakeFiles/sandbox-cartesian_control.dir/all
 all: CMakeFiles/sandbox-haiku.dir/all
+all: gazebo/all
 
 .PHONY : all
 
 # The main recursive "preinstall" target.
-preinstall:
+preinstall: gazebo/preinstall
 
 .PHONY : preinstall
 
 # The main recursive "clean" target.
 clean: CMakeFiles/sandbox-cartesian_control.dir/clean
+clean: CMakeFiles/uninstall.dir/clean
 clean: CMakeFiles/sandbox-haiku.dir/clean
+clean: gazebo/clean
 
 .PHONY : clean
+
+#=============================================================================
+# Directory level rules for directory gazebo
+
+# Recursive "all" directory target.
+gazebo/all:
+
+.PHONY : gazebo/all
+
+# Recursive "preinstall" directory target.
+gazebo/preinstall:
+
+.PHONY : gazebo/preinstall
+
+# Recursive "clean" directory target.
+gazebo/clean:
+
+.PHONY : gazebo/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/sandbox-cartesian_control.dir
@@ -95,6 +116,33 @@ sandbox-cartesian_control: CMakeFiles/sandbox-cartesian_control.dir/rule
 CMakeFiles/sandbox-cartesian_control.dir/clean:
 	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/clean
 .PHONY : CMakeFiles/sandbox-cartesian_control.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/uninstall.dir
+
+# All Build rule for target.
+CMakeFiles/uninstall.dir/all:
+	$(MAKE) -f CMakeFiles/uninstall.dir/build.make CMakeFiles/uninstall.dir/depend
+	$(MAKE) -f CMakeFiles/uninstall.dir/build.make CMakeFiles/uninstall.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/woolfrey/workspace/sandbox/build/CMakeFiles --progress-num= "Built target uninstall"
+.PHONY : CMakeFiles/uninstall.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/uninstall.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles 0
+	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/uninstall.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles 0
+.PHONY : CMakeFiles/uninstall.dir/rule
+
+# Convenience name for target.
+uninstall: CMakeFiles/uninstall.dir/rule
+
+.PHONY : uninstall
+
+# clean rule for target.
+CMakeFiles/uninstall.dir/clean:
+	$(MAKE) -f CMakeFiles/uninstall.dir/build.make CMakeFiles/uninstall.dir/clean
+.PHONY : CMakeFiles/uninstall.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/sandbox-haiku.dir

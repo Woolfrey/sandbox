@@ -68,6 +68,18 @@ install/strip/fast: preinstall/fast
 	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip/fast
 
+# Special rule for the target install/local
+install/local: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
+	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+.PHONY : install/local
+
+# Special rule for the target install/local
+install/local/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
+	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+.PHONY : install/local/fast
+
 # Special rule for the target install
 install: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
@@ -112,28 +124,16 @@ edit_cache/fast: edit_cache
 
 .PHONY : edit_cache/fast
 
-# Special rule for the target install/local
-install/local: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
-	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local
-
-# Special rule for the target install/local
-install/local/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
-	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local/fast
-
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles /home/woolfrey/workspace/sandbox/build/CMakeFiles/progress.marks
-	$(MAKE) -f CMakeFiles/Makefile2 all
+	cd /home/woolfrey/workspace/sandbox/build && $(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles /home/woolfrey/workspace/sandbox/build/gazebo/CMakeFiles/progress.marks
+	cd /home/woolfrey/workspace/sandbox/build && $(MAKE) -f CMakeFiles/Makefile2 gazebo/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	$(MAKE) -f CMakeFiles/Makefile2 clean
+	cd /home/woolfrey/workspace/sandbox/build && $(MAKE) -f CMakeFiles/Makefile2 gazebo/clean
 .PHONY : clean
 
 # The main clean target
@@ -143,111 +143,18 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/woolfrey/workspace/sandbox/build && $(MAKE) -f CMakeFiles/Makefile2 gazebo/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/woolfrey/workspace/sandbox/build && $(MAKE) -f CMakeFiles/Makefile2 gazebo/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/woolfrey/workspace/sandbox/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
-
-#=============================================================================
-# Target rules for targets named sandbox-cartesian_control
-
-# Build rule for target.
-sandbox-cartesian_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-cartesian_control
-.PHONY : sandbox-cartesian_control
-
-# fast build rule for target.
-sandbox-cartesian_control/fast:
-	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/build
-.PHONY : sandbox-cartesian_control/fast
-
-#=============================================================================
-# Target rules for targets named uninstall
-
-# Build rule for target.
-uninstall: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 uninstall
-.PHONY : uninstall
-
-# fast build rule for target.
-uninstall/fast:
-	$(MAKE) -f CMakeFiles/uninstall.dir/build.make CMakeFiles/uninstall.dir/build
-.PHONY : uninstall/fast
-
-#=============================================================================
-# Target rules for targets named sandbox-haiku
-
-# Build rule for target.
-sandbox-haiku: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 sandbox-haiku
-.PHONY : sandbox-haiku
-
-# fast build rule for target.
-sandbox-haiku/fast:
-	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/build
-.PHONY : sandbox-haiku/fast
-
-src/cartesian_control.o: src/cartesian_control.cpp.o
-
-.PHONY : src/cartesian_control.o
-
-# target to build an object file
-src/cartesian_control.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o
-.PHONY : src/cartesian_control.cpp.o
-
-src/cartesian_control.i: src/cartesian_control.cpp.i
-
-.PHONY : src/cartesian_control.i
-
-# target to preprocess a source file
-src/cartesian_control.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.i
-.PHONY : src/cartesian_control.cpp.i
-
-src/cartesian_control.s: src/cartesian_control.cpp.s
-
-.PHONY : src/cartesian_control.s
-
-# target to generate assembly for a file
-src/cartesian_control.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-cartesian_control.dir/build.make CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.s
-.PHONY : src/cartesian_control.cpp.s
-
-src/haiku.o: src/haiku.cpp.o
-
-.PHONY : src/haiku.o
-
-# target to build an object file
-src/haiku.cpp.o:
-	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.o
-.PHONY : src/haiku.cpp.o
-
-src/haiku.i: src/haiku.cpp.i
-
-.PHONY : src/haiku.i
-
-# target to preprocess a source file
-src/haiku.cpp.i:
-	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.i
-.PHONY : src/haiku.cpp.i
-
-src/haiku.s: src/haiku.cpp.s
-
-.PHONY : src/haiku.s
-
-# target to generate assembly for a file
-src/haiku.cpp.s:
-	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.s
-.PHONY : src/haiku.cpp.s
 
 # Help Target
 help:
@@ -256,20 +163,11 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... install/strip"
+	@echo "... install/local"
 	@echo "... install"
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... install/local"
-	@echo "... sandbox-cartesian_control"
-	@echo "... uninstall"
-	@echo "... sandbox-haiku"
-	@echo "... src/cartesian_control.o"
-	@echo "... src/cartesian_control.i"
-	@echo "... src/cartesian_control.s"
-	@echo "... src/haiku.o"
-	@echo "... src/haiku.i"
-	@echo "... src/haiku.s"
 .PHONY : help
 
 
@@ -281,6 +179,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/woolfrey/workspace/sandbox/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

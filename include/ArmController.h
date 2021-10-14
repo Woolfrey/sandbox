@@ -71,7 +71,11 @@ ArmController::ArmController(const std::string &local_port_name,
 	options.put("remote", remote_port_name);					// Where we want to connect to
 
 	this->driver.open(options);							// Assign the options to the driver
-	if(!this->driver.isValid())	yError("Unable to configure device. Double check what devices are available.");			
+	if(!this->driver.isValid())
+	{
+		yError("Unable to configure device. Here are the known devices:");
+		yInfo() <<  yarp::dev::Drivers::factory().toString().c_str();	
+	}		
 	else				yInfo() << "Successfully configured device driver for" << this->name+" arm";
 	
 	// Then configure the joint controllers
@@ -287,10 +291,16 @@ yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired
 	yarp::sig::Vector error(6);
 	yarp::sig::Vector axisAngle = yarp::math::dcm2axis(desired*yarp::math::SE3inv(actual));
 	
+	if(axisAngle[4] > M_PI)							// If angle is greater than 180 degrees...
+	{
+		axisAngle[4] = 2*M_PI - axisAngle[4];					// ... Take the shorter path
+		for(int i = 0; i < 3; i++) axisAngle[i] *= -1;			// Flip the axis of rotation to match
+	}
+	
 	for(int i = 0; i < 3; i++)
 	{
-		error[i] = desired[i][3] - actual[i][3];
-		error[i+3] = axisAngle[4]*axisAngle[i];
+		error[i] = desired[i][3] - actual[i][3];				// Position errors
+		error[i+3] = axisAngle[4]*axisAngle[i];				// Angle * axis (if this doesn't work, try sin(0.5*angle)*axis
 	}
 	return error;
 }

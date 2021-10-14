@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+	<world name="default">
+	
+		<include>
+			<uri>model://sun</uri>
+		</include>
+		 
+		<include>
+     			<uri>model://ground_plane</uri>
+		</include>
+		
+		<model name="iCub">
+			<include>
+				<uri>model://iCubGazeboV2_5_visuomanip</uri>
+				<pose>0.0 0.0 0.63 0.0 0.0 3.141593</pose>
+			</include>
+		</model>
+		
+	</world>
+</sdf>

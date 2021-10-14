@@ -25,6 +25,18 @@ CartesianTrajectory.h
 ../include/CartesianTrajectory.h
 Quintic.h
 -
+CubicSpline.h
+-
+
+../include/CubicSpline.h
+yarp/math/Math.h
+-
+yarp/sig/Matrix.h
+-
+yarp/sig/Vector.h
+-
+vector
+-
 
 ../include/Quintic.h
 yarp/sig/Vector.h
@@ -75,13 +87,25 @@ yarp/conf/api.h
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/conf/numeric.h
 sys/types.h
 -
-cstddef
--
-cstdint
--
 cfloat
 -
 cinttypes
+-
+clocale
+-
+cstdint
+-
+cstddef
+-
+cstdlib
+-
+cstring
+-
+limits
+-
+sstream
+-
+string
 -
 BaseTsd.h
 -
@@ -119,17 +143,11 @@ yarp/dev/IEncodersTimed.h
 -
 yarp/dev/ITorqueControl.h
 -
-yarp/dev/IControlMode2.h
--
 yarp/dev/IImpedanceControl.h
 -
 yarp/dev/IVelocityControl.h
 -
-yarp/dev/IVelocityControl2.h
--
 yarp/dev/IPositionControl.h
--
-yarp/dev/IPositionControl2.h
 -
 yarp/dev/ICurrentControl.h
 -
@@ -157,7 +175,15 @@ yarp/dev/IAxisInfo.h
 -
 yarp/dev/IControlLimits.h
 -
+yarp/dev/IControlMode.h
+-
 yarp/dev/ControlBoardVocabs.h
+-
+yarp/dev/IControlMode2.h
+-
+yarp/dev/IPositionControl2.h
+-
+yarp/dev/IVelocityControl2.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ControlBoardPid.h
@@ -239,6 +265,8 @@ yarp/dev/api.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode2.h
+yarp/conf/system.h
+-
 yarp/dev/IControlMode.h
 -
 
@@ -311,6 +339,8 @@ yarp/os/Vocab.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl2.h
+yarp/conf/system.h
+-
 yarp/dev/IPositionControl.h
 -
 
@@ -347,6 +377,8 @@ yarp/dev/api.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl2.h
+yarp/conf/system.h
+-
 yarp/dev/IVelocityControl.h
 -
 
@@ -408,6 +440,8 @@ yarp/os/Property.h
 yarp/os/Searchable.h
 -
 yarp/os/Value.h
+-
+yarp/os/Vocab.h
 -
 string
 -
@@ -721,6 +755,8 @@ string
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/QosStyle.h
 yarp/os/api.h
 -
+yarp/conf/numeric.h
+-
 string
 -
 
@@ -794,6 +830,8 @@ yarp/os/Bottle.h
 yarp/os/Portable.h
 -
 yarp/os/Searchable.h
+-
+yarp/os/Vocab.h
 -
 cstddef
 -

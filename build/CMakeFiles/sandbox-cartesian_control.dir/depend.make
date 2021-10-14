@@ -3,6 +3,7 @@
 
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/ArmController.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/CartesianTrajectory.h
+CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/CubicSpline.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/Quintic.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/ctrl/math.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/iKin/iKinFwd.h

@@ -4,6 +4,7 @@
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o
  ../include/ArmController.h
  ../include/CartesianTrajectory.h
+ ../include/CubicSpline.h
  ../include/Quintic.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/ctrl/math.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/iKin/iKinFwd.h

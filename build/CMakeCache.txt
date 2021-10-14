@@ -20,9 +20,8 @@ CMAKE_ADDR2LINE:FILEPATH=/usr/bin/addr2line
 //Path to a program.
 CMAKE_AR:FILEPATH=/usr/bin/ar
 
-//Choose the type of build, options are: None Debug Release RelWithDebInfo
-// MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=
+//Choose the type of build.
+CMAKE_BUILD_TYPE:STRING=Release
 
 //Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON
@@ -136,8 +135,8 @@ CMAKE_INSTALL_MANDIR:PATH=
 //C header files for non-gcc (/usr/include)
 CMAKE_INSTALL_OLDINCLUDEDIR:PATH=/usr/include
 
-//Install path prefix, prepended onto install directories.
-CMAKE_INSTALL_PREFIX:PATH=/usr/local
+//Install prefix
+CMAKE_INSTALL_PREFIX:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install
 
 //qml plugins (lib/qt5/qml)
 CMAKE_INSTALL_QMLDIR:PATH=lib/qt5/qml
@@ -269,8 +268,17 @@ GSL_BLAS_HEADER:PATH=/usr/include
 //Location of the gsl lib
 GSL_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libgsl.so
 
+//Set an rpath after installing the executables
+ICUBCONTRIB_INSTALL_WITH_RPATH:BOOL=ON
+
+//Compile shared libraries rather than static libraries
+ICUBCONTRIB_SHARED_LIBRARY:BOOL=OFF
+
 //The directory containing a CMake configuration file for ICUB.
 ICUB_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/ICUB
+
+//The directory containing a CMake configuration file for ICUBcontrib.
+ICUBcontrib_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/ICUBcontrib
 
 //Additional compiler flags for IPOPT
 IPOPT_DEFINITIONS:STRING=-DHAVE_CSTDDEF
@@ -285,31 +293,31 @@ IPOPT_LIBRARIES:STRING=
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
 //The directory containing a CMake configuration file for YARP.
-YARP_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP
+YARP_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP
 
 //Do not warn when using YARP deprecated declarations
 YARP_NO_DEPRECATED_WARNINGS:BOOL=OFF
 
 //The directory containing a CMake configuration file for YARP_conf.
-YARP_conf_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_conf
+YARP_conf_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_conf
 
 //The directory containing a CMake configuration file for YARP_dev.
-YARP_dev_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_dev
+YARP_dev_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_dev
 
 //The directory containing a CMake configuration file for YARP_gsl.
-YARP_gsl_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_gsl
+YARP_gsl_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_gsl
 
 //The directory containing a CMake configuration file for YARP_idl_tools.
-YARP_idl_tools_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_idl_tools
+YARP_idl_tools_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_idl_tools
 
 //The directory containing a CMake configuration file for YARP_math.
-YARP_math_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_math
+YARP_math_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_math
 
 //The directory containing a CMake configuration file for YARP_os.
-YARP_os_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_os
+YARP_os_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_os
 
 //The directory containing a CMake configuration file for YARP_sig.
-YARP_sig_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/YARP_sig
+YARP_sig_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP_sig
 
 //The directory containing a CMake configuration file for YCM.
 YCM_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/share/cmake/YCM
@@ -404,6 +412,8 @@ skinDynLib_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install
 CMAKE_ADDR2LINE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_AR
 CMAKE_AR-ADVANCED:INTERNAL=1
+//STRINGS property for variable: CMAKE_BUILD_TYPE
+CMAKE_BUILD_TYPE-STRINGS:INTERNAL=Release;MinSizeRel;Debug;RelWithDebInfo
 //This is the directory where this CMakeCache.txt was created
 CMAKE_CACHEFILE_DIR:INTERNAL=/home/woolfrey/workspace/sandbox/build
 //Major version of cmake used to create the current loaded cache
@@ -536,7 +546,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=1
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=2
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP
@@ -589,12 +599,51 @@ GSLCBLAS_LIBRARY-ADVANCED:INTERNAL=1
 GSL_BLAS_HEADER-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: GSL_LIBRARY
 GSL_LIBRARY-ADVANCED:INTERNAL=1
+//applications' XML descriptions installation directory for ICUBcontrib
+// (relative to build/installation dir)
+ICUBCONTRIB_APPLICATIONS_INSTALL_DIR:INTERNAL=share/ICUBcontrib/applications
+//application templates' installation directory for ICUBcontrib
+// (relative to build/installation dir)
+ICUBCONTRIB_APPLICATIONS_TEMPLATES_INSTALL_DIR:INTERNAL=share/ICUBcontrib/templates/applications
+//configuration files installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_CONFIG_INSTALL_DIR:INTERNAL=share/ICUBcontrib/config
+//contexts installation directory for ICUBcontrib (relative to
+// build/installation dir)
+ICUBCONTRIB_CONTEXTS_INSTALL_DIR:INTERNAL=share/ICUBcontrib/contexts
+//general data installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_DATA_INSTALL_DIR:INTERNAL=share/ICUBcontrib
+//dynamic plugins installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_DYNAMIC_PLUGINS_INSTALL_DIR:INTERNAL=lib/ICUBcontrib
+//modules' XML descriptions installation directory for ICUBcontrib
+// (relative to build/installation dir)
+ICUBCONTRIB_MODULES_INSTALL_DIR:INTERNAL=share/ICUBcontrib/modules
+//module templates' installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_MODULES_TEMPLATES_INSTALL_DIR:INTERNAL=share/ICUBcontrib/templates/modules
+//plugin manifests installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_PLUGIN_MANIFESTS_INSTALL_DIR:INTERNAL=share/ICUBcontrib/plugins
+//QML2 import directory for ICUBcontrib (relative to build/installation
+// dir)
+ICUBCONTRIB_QML2_IMPORT_DIR:INTERNAL=lib/qt5/qml
+//robot-specific configurations installation directory for ICUBcontrib
+// (relative to build/installation dir)
+ICUBCONTRIB_ROBOTS_INSTALL_DIR:INTERNAL=share/ICUBcontrib/robots
+//static plugins installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_STATIC_PLUGINS_INSTALL_DIR:INTERNAL=lib
+//general templates installation directory for ICUBcontrib (relative
+// to build/installation dir)
+ICUBCONTRIB_TEMPLATES_INSTALL_DIR:INTERNAL=share/ICUBcontrib/templates
 //List of iCub libraries
 ICUB_LIBRARIES:INTERNAL=
 //List of iCub linker options
 ICUB_LINK_FLAGS:INTERNAL=
 //iCub cmake scripts directory
-ICUB_MODULE_PATH:INTERNAL=/usr/share/iCub/cmake
+ICUB_MODULE_PATH:INTERNAL=/home/woolfrey/workspace/robotology-superbuild/build/install/share/iCub/cmake
 //ADVANCED property for variable: IPOPT_DEFINITIONS
 IPOPT_DEFINITIONS-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: IPOPT_INCLUDE_DIRS
@@ -603,6 +652,8 @@ IPOPT_INCLUDE_DIRS-ADVANCED:INTERNAL=1
 IPOPT_LIBRARIES-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+//ICUBcontrib modules are always built with dynamic plugins
+YARP_FORCE_DYNAMIC_PLUGINS:INTERNAL=TRUE
 //ADVANCED property for variable: YARP_NO_DEPRECATED_WARNINGS
 YARP_NO_DEPRECATED_WARNINGS-ADVANCED:INTERNAL=1
 //CMAKE_INSTALL_PREFIX during last run

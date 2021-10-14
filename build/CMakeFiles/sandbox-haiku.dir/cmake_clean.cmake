@@ -1,7 +1,7 @@
 file(REMOVE_RECURSE
   "CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.o"
-  "sandbox-haiku"
-  "sandbox-haiku.pdb"
+  "bin/sandbox-haiku"
+  "bin/sandbox-haiku.pdb"
 )
 
 # Per-language clean rules from dependency scanning.

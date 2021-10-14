@@ -1,4 +1,5 @@
 #include <Quintic.h>										// Custom trajectory class
+#include <CubicSpline.h>									// Custom trajectory class
 
 class CartesianTrajectory
 {
