@@ -1,4 +1,4 @@
-#include <yarp/math/Math.h>								// Math functions for yarp
+#include <yarp/math/SVD.h>								// Invert a matrix
 #include <yarp/sig/Matrix.h>								// yarp::sig::Matrix
 #include <yarp/sig/Vector.h>								// yarp::sig::Vector
 #include <vector>									// std::vector
@@ -55,12 +55,12 @@ CubicSpline::CubicSpline(const std::vector<yarp::sig::Vector> &_points,
 	}
 	
 	// Resize arrays, vectors accordingly
-	for(int i = 0; i < this->n-1; i++)						// Remember, there are only n-1 splines!
+	for(int i = 0; i < this->m; i++)
 	{
-		this->a.push_back(yarp::sig::Vector(this->m));
-		this->b.push_back(yarp::sig::Vector(this->m));
-		this->c.push_back(yarp::sig::Vector(this->m));
-		this->c.push_back(yarp::sig::Vector(this->m));
+		this->a.push_back(yarp::sig::Vector(this->n-1));			// There are n-1 splines for each of the m dimensions
+		this->b.push_back(yarp::sig::Vector(this->n-1));
+		this->c.push_back(yarp::sig::Vector(this->n-1));
+		this->c.push_back(yarp::sig::Vector(this->n-1));
 	}
 	
 	// We know the waypoints, s(i) for i = 1, ..., n.
@@ -103,7 +103,7 @@ CubicSpline::CubicSpline(const std::vector<yarp::sig::Vector> &_points,
 	// SPECIAL RULE FOR ANGLE-AXIS HERE
 	B(this->n-1, this->n-2) = -1/dt;
 	
-	yarp::sig::Matrix C = yarp::math::pinv(A);//*B;				// This makes future calcs a little easier
+	yarp::sig::Matrix C = yarp::math::pinv(A, 0.0)*B;				// This makes future calcs a little easier
 	
 	// Compute coefficients for all the splines across each dimension
 	yarp::sig::Vector s(this->n), sdd(this->n);					// Vectors of position, acceleration
@@ -112,11 +112,10 @@ CubicSpline::CubicSpline(const std::vector<yarp::sig::Vector> &_points,
 	{
 		for(int j = 0; j < this->n; j++) s[j]	= _points[i][j];		// Get all the points along the ith dimension
 		
-		// Perform the product sdd = C*j
 		sdd.zero();
 		for(int j = 0; j < this->n; j++)
 		{
-			for(int k = 0; k < this->n; j++) sdd[j] += C[j][k]*s[k];
+			for(int k = 0; k < this->n; j++) sdd[j] += C[j][k]*s[k];	// sdd = C*s
 		}	
 		
 		// Compute the coefficients for the n-1 splines
@@ -140,13 +139,54 @@ void CubicSpline::get_state(yarp::sig::Vector &pos,
 			     yarp::sig::Vector &acc,
 			     const float &t)
 {
-	// First, figure out which spline we are on
+	// Check the input dimensions are sound
+	if(pos.size() != vel.size() || vel.size() != acc.size())
+	{
+		yError() << "CubicSpline::get_state() : Input vectors are not of equal length.";
+	}
 	
-	// Then, compute the state
-		// Start: Position = start position, vel = 0, acc = 0
+	// Compute desired state based on time along the trajectory
+	if(t < this->time[0])								// Not yet started, so return first position
+	{
+		for(int i = 0; i < this->m; i++)
+		{
+			pos[i] = this->d[0][i];					// Start of the first spline?
+			vel[i] = 0.0;							// Don't move!
+			acc[i] = 0.0;
+		}
+	}
+	else if(t >= this->time[this->n])						// Finished, so maintain last position
+	{
+		float dt = this->time[this->n] - this->time[n-1];			// Time between second last and final waypoint
 		
-		// Middle: Do math
+		for(int i = 0; i < this->m; i++)
+		{
+			pos[i] = this->a[this->n-1][i]*pow(dt,3) + this->b[this->n-1][i]*pow(dt,2) + this->c[this->n-1][i]*dt + this->d[this->n-1][i];
+			vel[i] = 0.0;
+			acc[i] = 0.0;
+		}
+	}
+	else										// Somewhere in the middle
+	{
+		int j;
+		for(int i = 0; i < this->n-1; i++)
+		{
+			if(t < this->time[i+1])					// Must be on the ith spline		
+			{
+				j = i;
+				break;							// This should break the for loop
+			}
+		}			
 		
-		// End: position = end position, vel = 0, acc = 0
-	
+		yInfo() << "You are on spline number" << j + 1 << ".";		// Debugging
+		
+		float dt = t - this->time[j];						// Time since start of jth spline
+		
+		for(int i = 0; i < this->m; i++)
+		{
+			pos[i] =   this->a[i][j]*pow(dt,3) +   this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
+			vel[i] = 3*this->a[i][j]*pow(dt,2) + 2*this->b[i][j]*dt        + this->c[i][j];
+			acc[i] = 6*this->a[i][j]*dt        + 2*this->b[i][j];
+		}
+	}	
 }

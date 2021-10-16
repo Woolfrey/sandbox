@@ -49,6 +49,7 @@ CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/wool
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/api.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/Math.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/Quaternion.h
+CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/SVD.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/api.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/AbstractContactable.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Bottle.h

@@ -12,6 +12,7 @@
 #include <iCub/iKin/iKinFwd.h>							// iCub::iKin::iCubArm object
 #include <yarp/dev/ControlBoardInterfaces.h>						// Communicates with motor controllers on the robot?
 #include <yarp/dev/PolyDriver.h>							// Device driver class
+#include <yarp/math/SVD.h>								// yarp::math::pinv() and the like
 #include <yarp/os/LogStream.h>							// yarp::Info() and the like
 #include <yarp/os/Property.h>								// Don't know exactly what this does
 #include <CartesianTrajectory.h>							// Custom trajectory class
@@ -26,6 +27,7 @@ class ArmController : public iCub::iKin::iKinLimb
 		void close() {this->driver.close();}					// Closes the device drivers
 		void move_to_position(yarp::sig::Vector &target);			// Move joints to a desired state
 		void move_to_pose(yarp::sig::Matrix &target);				// Move hand to a desired state
+		void move_hand();							// Move hand at a constant speed
 		void move_up();							// Move the hand up 10cm
 		void move_down();							// Move the hand down 10cm
 		void move_left();							// Move the hand left 10cm
@@ -42,14 +44,23 @@ class ArmController : public iCub::iKin::iKinLimb
 		// These interface with the hardware
     		yarp::dev::IControlLimits* limits;					// Joint limits?
 		yarp::dev::IControlMode* mode;					// Sets the control mode of the motor
-		yarp::dev::IEncoders* encoder;
+		yarp::dev::IEncoders* encoder;					// Joint position values (in degrees)
 		yarp::dev::IVelocityControl* controller;				// Motor-level velocity controller
 		yarp::dev::PolyDriver driver;						// Device driver
 		
 		// Functions
 		bool update_state();							// Updates the kinematics internally
-		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired,
-						  const yarp::sig::Matrix &actual);
+		
+		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired,	// Converts the pose error from SE(3)to a 6x1 vector for feedback control
+						  const yarp::sig::Matrix &actual);				  
+		yarp::sig::Matrix get_joint_weighting();				// Get the weighting matrix for joint limit avoidance
+		yarp::sig::Matrix dls(const yarp::sig::Matrix &J);			// Get the DLS inverse of the Jacobian
+		
+		void rmrc(const yarp::sig::Vector &speed);
+		
+		
+		int direction = 1;
+		
 		
 };											// Semicolon needed after class declaration
 
@@ -181,6 +192,34 @@ void ArmController::move_to_position(yarp::sig::Vector &target)
 	}
 }
 
+/******************** Move hand at a given speed ********************/
+void ArmController::rmrc(const yarp::sig::Vector &speed)
+{
+	if(speed.size() !=6)
+	{
+		yError("ArmController::rmrc() : Expected a 6x1 vector for the input.");
+		
+		for(int i = 0; i < this->n; i++)
+		{
+			this->controller->velocityMove(i, 0.0);			// Stop the arm moving
+		}
+	}
+	else
+	{
+		yarp::sig::Matrix J = this->arm.GeoJacobian();			// Jacobian at current state (update before calling this function!)
+		yarp::sig::Matrix invJ = dls(J);					// DLS inverse with joint weighting
+		
+		yarp::sig::Vector control(this->n);
+		control.zero();
+		for(int i = 0; i < this->n; i++)
+		{
+			for(int j = 0; j < 6; j++) control[i] += invJ(i,j)*speed[j];
+		}
+		
+		for(int i = 0; i < this->n; i++) this->controller->velocityMove(i,control[i]*180/M_PI); // Convert to deg/s
+	}
+}
+
 /******************** Move the hand to a desired pose ********************/
 void ArmController::move_to_pose(yarp::sig::Matrix &target)
 {
@@ -188,7 +227,7 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 	yarp::sig::Matrix Ta = this->arm.getH();					// Get pose as homogeneous transformation matrix
 	
 	// Figure out optimal time scaling
-	float end_time = 1.5;
+	float end_time = 2.0;
 	
 	CartesianTrajectory trajectory(Ta, target, 0.0, end_time);			// Create trajectory object
 	
@@ -199,8 +238,9 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 	yarp::sig::Matrix Td(4,4);							// Desired pose as SE(3)
 	yarp::sig::Vector xdot_d(6), xddot_d(6);					// Desired velocity, acceleration
 	yarp::sig::Vector xe(6);							// Pose error
-	yarp::sig::Vector control(this->n);						// Command speed for joints
+	yarp::sig::Vector xdot(6);
 	yarp::sig::Matrix J(6,this->n);						// Jacobian matrix
+	
 	while(!finished)
 	{
 		elapsed_time = yarp::os::Time::now() - start_time;			// Elapsed time in control loop
@@ -208,37 +248,48 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 		trajectory.get_state(Td, xdot_d, xddot_d, elapsed_time);		// Get desired state
 		update_state();							// Update current joint states
 		Ta = this->arm.getH();							// Get the current hand pose
-		
-		xe = get_pose_error(Td, Ta);	
-		control.zero();							// Set joint commands to zero
+		xe = get_pose_error(Td, Ta);						// Compute the pose error
+
 		if(elapsed_time <= end_time)
 		{
-
-			J = this->arm.GeoJacobian();					// Get Jacobian at current state
-
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < this->n; j++)
-				{
-					control[i] += J(i,j)*(xdot_d[i] + 2.0*xe[i]); // Feedforward + feedback term
-				}
-			}
+			for(int i = 0; i < 6; i++) xdot[i] = xdot_d[i] + 5.0*xe[i];		
 		}
-		else 	finished = true;
-		
-		for(int i = 0; i < this->n; i++)
+		else 
 		{
-			this->controller->velocityMove(i, control[i]*180/M_PI); 	// Need to convert back to deg/s;
+			xdot.zero();							// Stop the end-effector moving
+			finished = true;
 		}
+		
+		rmrc(xdot);								// Move the hand at the desired speed
 		yarp::os::Time::delay(0.002);						// Wait a bit
 	}
 	
+	update_state();
+	Ta = this->arm.getH();
+	trajectory.get_state(Td, xdot_d, xddot_d, end_time);
+	xe = get_pose_error(Td, Ta);
 	std::cout << "Final error:" << std::endl;
 	for(int i = 0; i < 3; i++) std::cout << xe[i]*1000 << " (mm)" << std::endl;
-	std::cout << sqrt(xe[3]*xe[3] + xe[4]*xe[4] + xe[5]*xe[5])*180/M_PI << " (deg)" << std::endl;
-	
+	std::cout << sqrt(xe[3]*xe[3] + xe[4]*xe[4] + xe[5]*xe[5])*180/M_PI << " (deg)" << std::endl;	
 }
 
+/******************** Basic hand motions ********************/
+void ArmController::move_hand()
+{
+	yarp::sig::Vector speed({0.0, 0.05, 0.0, 0.0, 0.0, 0.0});
+	
+	double elapsed_time = 0.0;
+	double start_time = yarp::os::Time::now();
+	while(elapsed_time < 2.0)
+	{
+		elapsed_time = yarp::os::Time::now() - start_time;
+		rmrc(speed*direction);
+		yarp::os::Time::delay(0.002);						// Wait a bit
+	}
+	speed.zero();
+	rmrc(speed);
+	this->direction *= -1;
+}
 void ArmController::move_up()
 {
 	update_state();								// Obtain the latest joint state
@@ -303,4 +354,54 @@ yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired
 		error[i+3] = axisAngle[4]*axisAngle[i];				// Angle * axis (if this doesn't work, try sin(0.5*angle)*axis
 	}
 	return error;
+}
+
+/******************** Weighting matrix for joint limit avoidance ********************/
+yarp::sig::Matrix ArmController::get_joint_weighting()
+{
+	// NOTE: This function currently returns the INVERSE of the matrix, to save
+	// on computational cost. Might need to change this in the future when the inertia
+	// matrix is added.
+	
+	// Reference:
+	// Chan, T. F., & Dubey, R. V. (1995). A weighted least-norm solution based
+	// scheme for avoiding joint limits for redundant joint manipulators.
+	// IEEE Transactions on Robotics and Automation, 11(2), 286-292.
+	
+	yarp::sig::Matrix W(this->n, this->n);					// Value to be returned
+	W.eye();									// Set as identity
+	double qMin, qMax;								// Store min. and max. values here
+	float dwdq;									// Partial derivative
+	float dMin, dMax;								// Distance from upper and lower limits
+	for(int i = 0; i < this->n; i++)
+	{
+		this->limits->getLimits(i, &qMin, &qMax);				// Get the upper and lower bounds for this joint
+		dMin = this->q[i] - qMin;						// Distance from the lower limit
+		dMax = qMax - this->q[i];						// Distance from the upper limit
+		dwdq = 1/pow(dMax,2) - 1/pow(dMin,2);					// Partial derivative of the penalty function	
+		
+		// Override the identity if the joint is moving towards a limit
+		if(dwdq*this->qdot[i] > 0) W[i][i] = 1.0/((qMax - qMin)/(dMax*dMin) - 4/(qMax-qMin) + 1);
+	}
+	
+	return W; // NOTE: Currently the inverse
+}
+
+/******************** Get the DLS of the Jacobian ********************/
+yarp::sig::Matrix ArmController::dls(const yarp::sig::Matrix &J)
+{
+	yarp::sig::Matrix W = get_joint_weighting();					// Get the weighting matrix for joint limit avoidance (NOTE: Actually the inverse)
+	
+	yarp::sig::Matrix JWJt = J*W*J.transposed();					// Need this for further calcs
+	
+	float manipulability = sqrt(yarp::math::det(JWJt));				// Compute proximity to a singularity
+	
+	float damping = 0.0;
+	
+	if(manipulability < 0.001)							// If near singular...
+	{
+		damping = (1.0 - pow((manipulability/0.001),2))*0.1;			// ... increase the damping
+	}
+
+	return W*J.transposed()*yarp::math::pinvDamped(JWJt, damping);		// Return DLS inverse
 }

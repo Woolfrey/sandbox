@@ -15,6 +15,8 @@ yarp/dev/ControlBoardInterfaces.h
 -
 yarp/dev/PolyDriver.h
 -
+yarp/math/SVD.h
+-
 yarp/os/LogStream.h
 -
 yarp/os/Property.h
@@ -29,7 +31,7 @@ CubicSpline.h
 -
 
 ../include/CubicSpline.h
-yarp/math/Math.h
+yarp/math/SVD.h
 -
 yarp/sig/Matrix.h
 -
@@ -420,6 +422,14 @@ yarp/sig/Matrix.h
 yarp/os/Portable.h
 -
 yarp/os/NetInt32.h
+-
+
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/SVD.h
+yarp/sig/Vector.h
+-
+yarp/sig/Matrix.h
+-
+yarp/math/api.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/math/api.h

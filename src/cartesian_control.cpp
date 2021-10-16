@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 	// Create and configure the left arm
 	std::string local = "/local/left";						// Local port names	
 	std::string remote = "/icubSim/left_arm";					// Port names to connect with
-	std::string name = "left";							// Identifier for object
+	std::string name = "left_2.0"							// Identifier for object
 	ArmController left_arm(local, remote, name);					// Create left arm object
 	
 	// Configure communication across yarp
@@ -46,6 +46,13 @@ int main(int argc, char *argv[])
 		{
 			output.addString("Casa");
 			left_arm.move_to_position(home);
+		}
+		
+		// Move the arm back and forth
+		else if(command == "move")
+		{
+			output.addString("Moving...");
+			left_arm.move_hand();
 		}
 		
 		// Extend out both arms
