@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 	// Create and configure the left arm
 	std::string local = "/local/left";						// Local port names	
 	std::string remote = "/icubSim/left_arm";					// Port names to connect with
-	std::string name = "left_2.0"							// Identifier for object
+	std::string name = "left_2.0";							// Identifier for object
 	ArmController left_arm(local, remote, name);					// Create left arm object
 	
 	// Configure communication across yarp
@@ -28,17 +28,17 @@ int main(int argc, char *argv[])
 	bool active = true;
 	while(active)
 	{
-		output.clear();								// Clear any previous
+		output.clear();							// Clear any previous
 		
-		port.read(input, true);							// Get any commands over the network
-		command = input.toString();							// Convert to a string
+		port.read(input, true);						// Get any commands over the network
+		command = input.toString();						// Convert to a string
 		
 		// Shut down the robot
 		if(command == "close")
 		{
 			output.addString("Arrivederci");
 			left_arm.move_to_position(home);
-			active = false;							// Shut down the while loop
+			active = false;						// Shut down the while loop
 		}
 		
 		// Return to a home position

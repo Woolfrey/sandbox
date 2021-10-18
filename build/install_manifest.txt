@@ -1,1 +1,8 @@
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/box/materials/textures/cardboard_box.png
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/box/meshes/cardboard_box.dae
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/box/model.config
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/box/model.sdf
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/table/model.config
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/table/model.rsdf
+/home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/models/table/model.sdf
 /home/woolfrey/workspace/robotology-superbuild/build/install/share/gazebo/worlds/sandbox.sdf
