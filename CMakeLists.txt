@@ -25,4 +25,8 @@ add_executable(${PROJECT_NAME}-haiku src/haiku.cpp)
 add_executable(${PROJECT_NAME}-cartesian_control src/cartesian_control.cpp)
 target_link_libraries(${PROJECT_NAME}-cartesian_control ${YARP_LIBRARIES} ICUB::iKin)
 
+# Testing the threader class
+add_executable(${PROJECT_NAME}-threading src/threading.cpp)
+target_link_libraries(${PROJECT_NAME}-threading ${YARP_LIBRARIES})
+
 icubcontrib_add_uninstall_target()					# Enables uninstall
