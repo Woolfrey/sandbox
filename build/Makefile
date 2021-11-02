@@ -157,6 +157,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named sandbox-threading
+
+# Build rule for target.
+sandbox-threading: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 sandbox-threading
+.PHONY : sandbox-threading
+
+# fast build rule for target.
+sandbox-threading/fast:
+	$(MAKE) -f CMakeFiles/sandbox-threading.dir/build.make CMakeFiles/sandbox-threading.dir/build
+.PHONY : sandbox-threading/fast
+
+#=============================================================================
 # Target rules for targets named sandbox-cartesian_control
 
 # Build rule for target.
@@ -249,6 +262,33 @@ src/haiku.cpp.s:
 	$(MAKE) -f CMakeFiles/sandbox-haiku.dir/build.make CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.s
 .PHONY : src/haiku.cpp.s
 
+src/threading.o: src/threading.cpp.o
+
+.PHONY : src/threading.o
+
+# target to build an object file
+src/threading.cpp.o:
+	$(MAKE) -f CMakeFiles/sandbox-threading.dir/build.make CMakeFiles/sandbox-threading.dir/src/threading.cpp.o
+.PHONY : src/threading.cpp.o
+
+src/threading.i: src/threading.cpp.i
+
+.PHONY : src/threading.i
+
+# target to preprocess a source file
+src/threading.cpp.i:
+	$(MAKE) -f CMakeFiles/sandbox-threading.dir/build.make CMakeFiles/sandbox-threading.dir/src/threading.cpp.i
+.PHONY : src/threading.cpp.i
+
+src/threading.s: src/threading.cpp.s
+
+.PHONY : src/threading.s
+
+# target to generate assembly for a file
+src/threading.cpp.s:
+	$(MAKE) -f CMakeFiles/sandbox-threading.dir/build.make CMakeFiles/sandbox-threading.dir/src/threading.cpp.s
+.PHONY : src/threading.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -260,6 +300,7 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... sandbox-threading"
 	@echo "... install/local"
 	@echo "... sandbox-cartesian_control"
 	@echo "... uninstall"
@@ -270,6 +311,9 @@ help:
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
+	@echo "... src/threading.o"
+	@echo "... src/threading.i"
+	@echo "... src/threading.s"
 .PHONY : help
 
 

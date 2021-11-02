@@ -6,7 +6,11 @@
 
 #IncludeRegexTransform: 
 
-/home/woolfrey/workspace/sandbox/src/haiku.cpp
+../include/Haiku.h
 iostream
+-
+
+/home/woolfrey/workspace/sandbox/src/haiku.cpp
+Haiku.h
 -
 

@@ -154,7 +154,7 @@ void ArmController::move_to_position(yarp::sig::Vector &target)
 		else		dt = (15*dq)/(8*vMin);					
 		if(dt > end_time) end_time = dt;					// Update based on maximum time
 	}
-	end_time *= 1.5;								// Make the time a bit longer
+	end_time *= 2.0;								// Make the time a bit longer
 
 	Quintic trajectory(this->q.subVector(0,6), target, 0, end_time);		// Create trajectory object
 	
@@ -207,14 +207,17 @@ void ArmController::rmrc(const yarp::sig::Vector &speed)
 	else
 	{
 		yarp::sig::Matrix J = this->arm.GeoJacobian();			// Jacobian at current state (update before calling this function!)
-		yarp::sig::Matrix invJ = dls(J);					// DLS inverse with joint weighting
+		//yarp::sig::Matrix invJ = dls(J);					// DLS inverse with joint weighting
+		
+		yarp::sig::Vector control = yarp::math::pinv(J)*speed;
+		/*
 		
 		yarp::sig::Vector control(this->n);
 		control.zero();
 		for(int i = 0; i < this->n; i++)
 		{
 			for(int j = 0; j < 6; j++) control[i] += invJ(i,j)*speed[j];
-		}
+		}*/
 		
 		for(int i = 0; i < this->n; i++) this->controller->velocityMove(i,control[i]*180/M_PI); // Convert to deg/s
 	}
@@ -227,7 +230,7 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 	yarp::sig::Matrix Ta = this->arm.getH();					// Get pose as homogeneous transformation matrix
 	
 	// Figure out optimal time scaling
-	float end_time = 2.0;
+	float end_time = 3.0;
 	
 	CartesianTrajectory trajectory(Ta, target, 0.0, end_time);			// Create trajectory object
 	
@@ -252,7 +255,7 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 
 		if(elapsed_time <= end_time)
 		{
-			for(int i = 0; i < 6; i++) xdot[i] = xdot_d[i] + 5.0*xe[i];		
+			for(int i = 0; i < 6; i++) xdot[i] = xdot_d[i] + 0.5*xe[i];		
 		}
 		else 
 		{
@@ -276,11 +279,11 @@ void ArmController::move_to_pose(yarp::sig::Matrix &target)
 /******************** Basic hand motions ********************/
 void ArmController::move_hand()
 {
-	yarp::sig::Vector speed({0.0, 0.05, 0.0, 0.0, 0.0, 0.0});
+	yarp::sig::Vector speed({0.0, 0.01, 0.0, 0.0, 0.0, 0.0});
 	
 	double elapsed_time = 0.0;
 	double start_time = yarp::os::Time::now();
-	while(elapsed_time < 2.0)
+	while(elapsed_time < 1.0)
 	{
 		elapsed_time = yarp::os::Time::now() - start_time;
 		rmrc(speed*direction);
@@ -370,7 +373,7 @@ yarp::sig::Matrix ArmController::get_joint_weighting()
 	
 	yarp::sig::Matrix W(this->n, this->n);					// Value to be returned
 	W.eye();									// Set as identity
-	double qMin, qMax;								// Store min. and max. values here
+/*	double qMin, qMax;								// Store min. and max. values here
 	float dwdq;									// Partial derivative
 	float dMin, dMax;								// Distance from upper and lower limits
 	for(int i = 0; i < this->n; i++)
@@ -382,7 +385,7 @@ yarp::sig::Matrix ArmController::get_joint_weighting()
 		
 		// Override the identity if the joint is moving towards a limit
 		if(dwdq*this->qdot[i] > 0) W[i][i] = 1.0/((qMax - qMin)/(dMax*dMin) - 4/(qMax-qMin) + 1);
-	}
+	}*/
 	
 	return W; // NOTE: Currently the inverse
 }
@@ -398,9 +401,10 @@ yarp::sig::Matrix ArmController::dls(const yarp::sig::Matrix &J)
 	
 	float damping = 0.0;
 	
-	if(manipulability < 0.001)							// If near singular...
+	if(manipulability < 0.0005)							// If near singular...
 	{
-		damping = (1.0 - pow((manipulability/0.001),2))*0.1;			// ... increase the damping
+		yError("Near singular!");
+		damping = (1.0 - pow((manipulability/0.0005),2))*0.01;		// ... increase the damping
 	}
 
 	return W*J.transposed()*yarp::math::pinvDamped(JWJt, damping);		// Return DLS inverse

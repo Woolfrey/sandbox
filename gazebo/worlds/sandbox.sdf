@@ -2,6 +2,13 @@
 <sdf version="1.7">
 	<world name="default">
 	
+		<physics default="1" name="custom_physics" type="ode">
+			<real_time_update_rate>500.0</real_time_update_rate>
+			<max_contacts>5</max_contacts>
+			<max_step_size>0.001</max_step_size>
+			<real_time_factor>1.0</real_time_factor>
+		</physics>
+	
 		<include>
 			<uri>model://sun</uri>
 		</include>
@@ -24,7 +31,7 @@
 		
 		<include>
      			<uri>model://box</uri>
-			<pose>0.5 0 0.68 0 0 0</pose>
+			<pose>0.35 0 0.68 0 0 0</pose>
 		</include>
 				
 	</world>

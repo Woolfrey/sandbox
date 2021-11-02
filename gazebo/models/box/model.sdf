@@ -1,23 +1,32 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
+
+<!--
+	Inertia of a rectunglar prism with length (x), width (y), and height (z):
+	
+	Ixx = m*(y^2 + z^2)/12
+	Iyy = m*(x^2 + z^2)/12
+	Izz = m*(x^2 + y^2)/12
+-->
+
 <sdf version="1.6">
 	<model name="box">
 		<pose>0 0 0 0 0 0</pose>
 		<link name="link">
 			<inertial>
-				<mass>2</mass>
+				<mass>1.0</mass>
 				<inertia>
-					<ixx>0.041666667</ixx>
+					<ixx>0.006666667</ixx>
 					<ixy>0</ixy>
 					<ixz>0</ixz>
-					<iyy>0.056666667</iyy>
+					<iyy>0.006666667</iyy>
 					<iyz>0</iyz>
-					<izz>0.068333333</izz>
+					<izz>0.006666667</izz>
 				</inertia>
 			</inertial>
 			<collision name="collision">
 				<geometry>
 					<box>
-						<size>0.3 0.3 0.3</size>
+						<size>0.2 0.2 0.2</size>  <!-- default 0.4 0.4 0.4 -->
 					</box>
 				</geometry>
 				<surface>
@@ -38,11 +47,11 @@
 				</surface>
 			</collision>
 			<visual name="visual">
-				<pose>0.0 0.0 -0.15 0.0 0.0 0.0</pose>
+				<pose>0.0 0.0 -0.1 0.0 0.0 0.0</pose>	<!-- Need to move the collision box DOWN by half the height -->
 				<geometry>
 					<mesh>
 						<uri>model://cardboard_box/meshes/cardboard_box.dae</uri>
-						<scale>0.75 0.75 0.75</scale>
+						<scale>0.5 0.5 0.5</scale> <!-- Scale here needs to match the size of the collision box -->
 					</mesh>
 				</geometry>
 			</visual>
