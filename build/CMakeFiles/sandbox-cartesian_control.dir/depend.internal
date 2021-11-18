@@ -5,6 +5,8 @@ CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o
  ../include/ArmController.h
  ../include/CartesianTrajectory.h
  ../include/CubicSpline.h
+ ../include/DualArmController.h
+ ../include/MultiJointController.h
  ../include/Quintic.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/ctrl/math.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/iKin/iKinFwd.h
@@ -77,6 +79,7 @@ CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Network.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/NetworkClock.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Os.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PeriodicThread.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Port.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PortReader.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PortReaderBuffer-inl.h

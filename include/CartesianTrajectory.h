@@ -4,6 +4,8 @@
 class CartesianTrajectory
 {
 	public:
+		CartesianTrajectory() {};							// Empty constructor
+		
 		CartesianTrajectory(	const yarp::sig::Matrix &start_pose,			// Basic constructor
 					const yarp::sig::Matrix &end_pose,
 					const float &start_time,

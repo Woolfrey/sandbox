@@ -1,3 +1,7 @@
+#ifndef QUINTIC_H_
+#define QUINTIC_H_
+#include <math.h>
+#include <yarp/os/LogStream.h>							// yarp::Info() and the like
 #include <yarp/sig/Vector.h>
 #include <yarp/sig/Matrix.h>
 #include <yarp/math/Math.h>
@@ -102,9 +106,9 @@ Quintic::Quintic(const yarp::sig::Vector &_axisAngle,
 		this->t2 = temp;
 	}
 	
-	if(this->axisAngle[3] > M_PI)						// Rotation is greater than 180 degrees
+	if(this->axisAngle[3] > 3.1416)					// Rotation is greater than 180 degrees
 	{
-		this->axisAngle[3] = 2*M_PI - this->axisAngle[3];		// Take the short path
+		this->axisAngle[3] = 2*3.1416 - this->axisAngle[3];		// Take the short path
 		for(int i = 0; i < 3; i++) this->axisAngle[i] *= -1;		// Flip the axis to match
 	}
 	
@@ -202,3 +206,4 @@ void Quintic::compute_coefficients()
 	this->b = -15*pow(dt,-4);
 	this->c =  10*pow(dt,-3);
 }
+#endif

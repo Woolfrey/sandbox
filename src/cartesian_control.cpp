@@ -1,20 +1,19 @@
-#include <ArmController.h>
+/* NOTE: Temporarily commented out critical code */
+
+#include <DualArmController.h>
 #include <yarp/os/RpcServer.h>
 
 // Pre-defined positions
-yarp::sig::Vector home({0.0, 10.0, 0.0, 16.0, 0.0, 0.0, 0.0});
-yarp::sig::Vector receive({-50, 0, 0, 50, -60, 0, 0});
-yarp::sig::Vector shake({-50, 20, 0, 50, 0, 0, 0});
-yarp::sig::Vector wave({-30, 50, -30, 105, 30, 0, 0});
+yarp::sig::Vector home({-30.0, 30.0,  00.0,  45.0, 00.0, 00.0, 00.0});		// Starting pose
+yarp::sig::Vector receive({-50.0, 00.0, 00.0, 50.0, -60.0, 00.0, 00.0});		// Extend arm out, palm up
+yarp::sig::Vector shake({-50.0, 20.0, 00.0, 50.0, 00.0, 00.0, 00.0});		// Extend arm out, palm sideways
+yarp::sig::Vector wave({-30.0, 50.0, -30.0, 105.0, 30.0, 00.0, 00.0});		// Raise hand up
+
 
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
 {
-	// Create and configure the left arm
-	std::string local = "/local/left";						// Local port names	
-	std::string remote = "/icubSim/left_arm";					// Port names to connect with
-	std::string name = "left_2.0";							// Identifier for object
-	ArmController left_arm(local, remote, name);					// Create left arm object
+	DualArmController controller;							// Create dual arm controller object
 	
 	// Configure communication across yarp
 	yarp::os::RpcServer port;							// Create a port for sending and receiving information
@@ -24,12 +23,13 @@ int main(int argc, char *argv[])
 	std::string command;								// Response message, command from user
 	
 	
-	// Run the control
+	// Run the control loop
 	bool active = true;
+	
 	while(active)
 	{
 		output.clear();							// Clear any previous
-		
+	
 		port.read(input, true);						// Get any commands over the network
 		command = input.toString();						// Convert to a string
 		
@@ -37,82 +37,44 @@ int main(int argc, char *argv[])
 		if(command == "close")
 		{
 			output.addString("Arrivederci");
-			left_arm.move_to_position(home);
 			active = false;						// Shut down the while loop
 		}
 		
-		// Return to a home position
-		else if(command == "home")
+		// Move the arms back to the starting position
+		if(command == "home")
 		{
+			controller.move_to_position(home, home);
 			output.addString("Casa");
-			left_arm.move_to_position(home);
 		}
 		
-		// Move the arm back and forth
-		else if(command == "move")
+		// Get the current joint positions
+		else if(command == "read")
 		{
-			output.addString("Moving...");
-			left_arm.move_hand();
+			yarp::sig::Vector q = controller.get_positions("left");	// Temporary storage location
+			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]);	// Return rounded values
 		}
 		
-		// Extend out both arms
-		else if(command == "receive")
-		{
-			output.addString("Grazie");	
-			left_arm.move_to_position(receive);
-		}
-
 		// Extend one arm to shake hands
 		else if(command == "shake")
 		{
+			controller.move_to_position(home, shake);
 			output.addString("Piacere");
-			left_arm.move_to_position(shake);
 		}
-
-		// Wave one arm
+		
+		// Wave one hand
 		else if(command == "wave")
 		{
+			controller.move_to_position(home, wave);			// Raise 1 hand to wave
+			yarp::os::Time::delay(3.0);					// Wait a little bit
+			controller.move_to_position(home, home);			// Return to start
 			output.addString("Ciao");
-			left_arm.move_to_position(wave);
 		}
 		
-		// Move the hand up
-		else if(command == "up")
-		{
-			output.addString("Up we go");
-			left_arm.move_up();
-		}
-		else if(command == "down")
-		{
-			output.addString("Down we go");
-			left_arm.move_down();
-		}
-		else if(command == "left")
-		{
-			output.addString("To the left");
-			left_arm.move_left();
-		}
-			else if(command == "right")
-		{
-			output.addString("To the right");
-			left_arm.move_right();
-		}
-		
-		// Unknown command
-		else
-		{
-			output.addString("Cosa");
-		}
-		
-		port.reply(output);								// Send response to user
+		port.reply(output);
 	}
 	
-	left_arm.close();
 	
-	left_arm.close();								// Close the device drivers
-	
-
+	controller.close();
+		
 	return 0;									// No problems with main
 }
-
-

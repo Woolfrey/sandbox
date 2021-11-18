@@ -153,11 +153,13 @@ int main(int argc, char *argv[])
 		// Get the current joint positions
 		else if(command == "read")
 		{
+		
+			
 			getEncoderValues(*encoders,joint_position);
 			
 			for(int i = 0; i < n; i++)
 			{
-				output.addDouble(joint_position[i]);		// Return rounded values
+				output.addDouble(joint_position[i]);
 			}
 		}
 		

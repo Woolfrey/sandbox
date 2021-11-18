@@ -14,20 +14,18 @@ class Threader : public yarp::os::PeriodicThread					// Inherits the PeriodicThr
 
 		bool threadInit()							// Executed before run()
 		{
+			std::cout << "Worker bees can leave." << std::endl;
 			return true;
 		}
 		
 		void run()								// Executed every time period afer ControlThread.start() is called
 		{
-			haiku();
-			std::cout << "." << std::endl;
-			std::cout << "." << std::endl;
-			std::cout << "." << std::endl;
+			std::cout << "Even drones can fly away." << std::endl;
 		}
 		
 		void threadRelease()							// Things done when stop() is called
 		{
-		
+			std::cout << "The Queen is their slave." << std::endl;
 		}
 };											// Needed after a class declaration
 

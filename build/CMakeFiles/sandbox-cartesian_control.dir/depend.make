@@ -4,6 +4,8 @@
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/ArmController.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/CartesianTrajectory.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/CubicSpline.h
+CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/DualArmController.h
+CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/MultiJointController.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: ../include/Quintic.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/ctrl/math.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/iCub/iKin/iKinFwd.h
@@ -76,6 +78,7 @@ CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/wool
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Network.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/NetworkClock.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Os.h
+CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PeriodicThread.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Port.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PortReader.h
 CMakeFiles/sandbox-cartesian_control.dir/src/cartesian_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PortReaderBuffer-inl.h

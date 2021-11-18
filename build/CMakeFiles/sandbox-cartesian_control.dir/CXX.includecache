@@ -7,21 +7,11 @@
 #IncludeRegexTransform: 
 
 ../include/ArmController.h
-iostream
+CartesianTrajectory.h
 -
 iCub/iKin/iKinFwd.h
 -
-yarp/dev/ControlBoardInterfaces.h
--
-yarp/dev/PolyDriver.h
--
-yarp/math/SVD.h
--
-yarp/os/LogStream.h
--
-yarp/os/Property.h
--
-CartesianTrajectory.h
+MultiJointController.h
 -
 
 ../include/CartesianTrajectory.h
@@ -40,7 +30,31 @@ yarp/sig/Vector.h
 vector
 -
 
+../include/DualArmController.h
+ArmController.h
+-
+
+../include/MultiJointController.h
+Quintic.h
+-
+yarp/dev/ControlBoardInterfaces.h
+-
+yarp/dev/PolyDriver.h
+-
+yarp/os/LogStream.h
+-
+yarp/os/PeriodicThread.h
+-
+yarp/os/Property.h
+-
+yarp/sig/Vector.h
+-
+
 ../include/Quintic.h
+math.h
+-
+yarp/os/LogStream.h
+-
 yarp/sig/Vector.h
 -
 yarp/sig/Matrix.h
@@ -660,6 +674,12 @@ cstddef
 string
 -
 
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/PeriodicThread.h
+yarp/os/api.h
+-
+yarp/os/Time.h
+-
+
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Port.h
 yarp/os/api.h
 -
@@ -899,7 +919,7 @@ yarp/conf/api.h
 -
 
 /home/woolfrey/workspace/sandbox/src/cartesian_control.cpp
-ArmController.h
+DualArmController.h
 -
 yarp/os/RpcServer.h
 -

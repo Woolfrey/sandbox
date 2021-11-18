@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <!--
-	Inertia of a rectunglar prism with length (x), width (y), and height (z):
+	Inertia of a rectanglar prism with length (x), width (y), and height (z):
 	
 	Ixx = m*(y^2 + z^2)/12
 	Iyy = m*(x^2 + z^2)/12
