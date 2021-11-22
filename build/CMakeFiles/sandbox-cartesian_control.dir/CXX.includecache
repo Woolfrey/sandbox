@@ -33,6 +33,10 @@ vector
 ../include/DualArmController.h
 ArmController.h
 -
+vector
+-
+yarp/os/PeriodicThread.h
+-
 
 ../include/MultiJointController.h
 Quintic.h
@@ -43,11 +47,7 @@ yarp/dev/PolyDriver.h
 -
 yarp/os/LogStream.h
 -
-yarp/os/PeriodicThread.h
--
 yarp/os/Property.h
--
-yarp/sig/Vector.h
 -
 
 ../include/Quintic.h

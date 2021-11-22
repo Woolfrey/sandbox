@@ -1,3 +1,5 @@
+#ifndef CARTESIANTRAJECTORY_H_
+#define CARTESIANTRAJECTORY_H_
 #include <Quintic.h>										// Custom trajectory class
 #include <CubicSpline.h>									// Custom trajectory class
 
@@ -153,3 +155,4 @@ void CartesianTrajectory::get_state(yarp::sig::Matrix &pose,					// Get the desi
 		}
 	}
 }
+#endif

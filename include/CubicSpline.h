@@ -1,3 +1,5 @@
+#ifndef CUBICSPLINE_H_
+#define CUBICSPLINE_H_
 #include <yarp/math/SVD.h>								// Invert a matrix
 #include <yarp/sig/Matrix.h>								// yarp::sig::Matrix
 #include <yarp/sig/Vector.h>								// yarp::sig::Vector
@@ -190,3 +192,5 @@ void CubicSpline::get_state(yarp::sig::Vector &pos,
 		}
 	}	
 }
+
+#endif

@@ -13,16 +13,17 @@ yarp::sig::Vector wave({-30.0, 50.0, -30.0, 105.0, 30.0, 00.0, 00.0});		// Raise
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
 {
-	DualArmController controller;							// Create dual arm controller object
+	yarp::os::Network yarp;							// Connect to the yarp connectwork
 	
+	DualArmController controller;							// Create dual arm controller object
+
 	// Configure communication across yarp
 	yarp::os::RpcServer port;							// Create a port for sending and receiving information
 	port.open("/command");								// Open the port with the name /command
 	yarp::os::Bottle input;							// Store information from user input
 	yarp::os::Bottle output;							// Store information to send to user
 	std::string command;								// Response message, command from user
-	
-	
+		
 	// Run the control loop
 	bool active = true;
 	
@@ -38,6 +39,20 @@ int main(int argc, char *argv[])
 		{
 			output.addString("Arrivederci");
 			active = false;						// Shut down the while loop
+		}
+		
+		// Move both hands up
+		if(command == "freeze")
+		{
+			controller.move_to_position(wave, wave);
+			output.addString("Gasp!");
+		}
+		
+		// Move hands to a grasp position
+		if(command == "grasp")
+		{
+			controller.move_to_position(shake, shake);
+			output.addString("Pronto");
 		}
 		
 		// Move the arms back to the starting position
@@ -65,15 +80,12 @@ int main(int argc, char *argv[])
 		else if(command == "wave")
 		{
 			controller.move_to_position(home, wave);			// Raise 1 hand to wave
-			yarp::os::Time::delay(3.0);					// Wait a little bit
-			controller.move_to_position(home, home);			// Return to start
 			output.addString("Ciao");
 		}
 		
 		port.reply(output);
 	}
-	
-	
+		
 	controller.close();
 		
 	return 0;									// No problems with main
