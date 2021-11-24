@@ -15,14 +15,14 @@ int main(int argc, char *argv[])
 {
 	yarp::os::Network yarp;							// Connect to the yarp connectwork
 	
-	DualArmController controller;							// Create dual arm controller object
+	DualArmController controller;						// Create dual arm controller object
 
 	// Configure communication across yarp
-	yarp::os::RpcServer port;							// Create a port for sending and receiving information
-	port.open("/command");								// Open the port with the name /command
+	yarp::os::RpcServer port;						// Create a port for sending and receiving information
+	port.open("/command");							// Open the port with the name /command
 	yarp::os::Bottle input;							// Store information from user input
-	yarp::os::Bottle output;							// Store information to send to user
-	std::string command;								// Response message, command from user
+	yarp::os::Bottle output;						// Store information to send to user
+	std::string command;							// Response message, command from user
 		
 	// Run the control loop
 	bool active = true;
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 		output.clear();							// Clear any previous
 	
 		port.read(input, true);						// Get any commands over the network
-		command = input.toString();						// Convert to a string
+		command = input.toString();					// Convert to a string
 		
 		// Shut down the robot
 		if(command == "close")
@@ -62,22 +62,34 @@ int main(int argc, char *argv[])
 			output.addString("Casa");
 		}
 		
+		// Move the hands inwards
+		if(command == "in")
+		{
+			controller.move_lateral(0.1);
+			output.addString("Closer");
+		}
+		if(command == "out")
+		{
+			controller.move_lateral(-0.1);
+			output.addString("Further");
+		}
+		
 		// Get the current joint positions
-		else if(command == "read")
+		if(command == "read")
 		{
 			yarp::sig::Vector q = controller.get_positions("left");	// Temporary storage location
-			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]);	// Return rounded values
+			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]); // Return rounded values
 		}
 		
 		// Extend one arm to shake hands
-		else if(command == "shake")
+		if(command == "shake")
 		{
 			controller.move_to_position(home, shake);
 			output.addString("Piacere");
 		}
 		
 		// Wave one hand
-		else if(command == "wave")
+		if(command == "wave")
 		{
 			controller.move_to_position(home, wave);			// Raise 1 hand to wave
 			output.addString("Ciao");

@@ -1,11 +1,12 @@
-#include <CartesianTrajectory.h>							// Custom trajectory object
+#include <iostream>
+#include <CartesianTrajectory.h>						// Custom trajectory object
 #include <iCub/iKin/iKinFwd.h>							// iCub::iKin::iCubArm object
-#include <MultiJointController.h>							// Custom low-level interface with robot
+#include <MultiJointController.h>						// Custom low-level interface with robot
 
 class ArmController : public MultiJointController
 {
 	public:
-		ArmController() {};							// Empty constructor
+		ArmController() {};						// Empty constructor
 		
 		void configure(const std::string &local_port_name,
 				const std::string &remote_port_name,
@@ -14,27 +15,28 @@ class ArmController : public MultiJointController
 		void set_cartesian_trajectory(const yarp::sig::Matrix &desired,	// Set new Cartesian trajectory
 						const double &time);
 						
-		yarp::sig::Vector cartesian_control(const double &time);		// Get the end-effector velolcity to track the trajectory
+		yarp::sig::Vector cartesian_control(const double &time);		// Track the internal trajectory
 		
 		
-		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();}
+		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();} // Get the Jacobian for the current pose
+		yarp::sig::Matrix get_pose() {return this->arm.getH();}		// Get the pose of the hand
+		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired);
 		
 		void set_angles(yarp::sig::Vector &input) {this->arm.setAng(input*M_PI/180);}		
 		
 	private:
 		CartesianTrajectory trajectory;					// Self explanatory
 		
-		iCub::iKin::iCubArm arm;						// iCubArm object
+		iCub::iKin::iCubArm arm;					// iCubArm object
 		
-		yarp::sig::Matrix pos;							// Desired pose for the hand
+		yarp::sig::Matrix pos;						// Desired pose for the hand
 		
-		yarp::sig::Vector vel, acc, err, angleAxis;				// Desired velocity, acceleration, pose error
+		yarp::sig::Vector vel, acc, err, angleAxis;			// Desired velocity, acceleration, pose error
 
-};											// Semicolon needed after a class declaration
+};										// Semicolon needed after a class declaration
 
 /******************** Set new Cartesian trajectory to track ********************/
-void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired,
-						const double &time)
+void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired, const double &time)
 {
 	// NOTE: Ensure joint state is updated properly BEFORE calling this function!
 	
@@ -44,7 +46,7 @@ void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired,
 	}
 	else
 	{
-		this->trajectory = CartesianTrajectory(this->arm.getH(),desired, 0, time);
+		this->trajectory = CartesianTrajectory(this->arm.getH(),desired, 0.0, time);
 	}
 }
 
@@ -52,22 +54,46 @@ void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired,
 yarp::sig::Vector ArmController::cartesian_control(const double &time)
 {
 	// NOTE TO SELF: If there's a problem with orientation feedback, it's probably here!
-	
-	yarp::sig::Matrix T = this->arm.getH();						// Get the actual end-effector pose
-	
-	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get desired state for current time
-	
-	yarp::sig::Vector angleAxis = yarp::math::dcm2axis(pos*yarp::math::SE3inv(T)); // Compute the orientation error
-	
-	for(int i = 0; i < 3; i++)
-	{
-		this->err[i]	= this->pos[i][3] - T[i][3];				// Position error
-		this->err[i+3]	= this->angleAxis[0]*this->angleAxis[i];		// Angle*Axis
-	}
 
-	return this->vel + 2*this->err;						// Return feedforward + feedback control
+	this->trajectory.get_state(this->pos, this->vel, this->acc, time);	// Get desired state for current time
+/*	
+	yInfo() << "Time:" << time;
+	yInfo() << "Desired pose:";
+	std::cout << this->pos.toString() << std::endl;
+	
+	yInfo() << "Desired velocity:";
+	std::cout << this->vel.toString() << std::endl;
+	
+	yInfo() << "Desired acceleration:";
+	std::cout << this->acc.toString() << std::endl;
+*/
+
+	return this->vel + 2*get_pose_error(this->pos);
 }
 
+/******************** Get the pose error between the current and desired pose ********************/
+yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired)
+{
+	yarp::sig::Vector error(6);
+	// Check the inputs are sound
+	if(desired.rows() != 4 || desired.cols() != 4)
+	{
+		yError("ArmController::get_pose_error() : Expected a 4x4 matrix as an input.");
+		error.zero();
+	}
+	else
+	{
+		yarp::sig::Matrix actual = this->arm.getH();
+		yarp::sig::Vector axisAngle = yarp::math::dcm2axis(desired*actual.transposed());
+		
+		for(int i = 0; i < 3; i++)
+		{
+			error[i]	= desired[i][3] - actual[i][3];
+			error[i+3]	= angleAxis[3]*axisAngle[i];
+		}
+	}
+	return error;
+}
 /******************** Configure the left arm ********************/
 void ArmController::configure(const std::string &local_port_name,
 				const std::string &remote_port_name,

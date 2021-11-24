@@ -1,6 +1,6 @@
-#include <ArmController.h>
-#include <vector>								// std::vector
-#include <yarp/os/PeriodicThread.h>
+#include <iostream>					// For debugging
+#include <ArmController.h>				// Handles forward kinematics
+#include <yarp/os/PeriodicThread.h>			// Control loop
 
 class DualArmController : virtual public yarp::os::PeriodicThread
 {
@@ -8,22 +8,23 @@ class DualArmController : virtual public yarp::os::PeriodicThread
 		DualArmController();						// Constructor
 		
 		void update_state();						// Update state for all objects
-		void move_to_position(yarp::sig::Vector &left,		// Move the joints to a desired configuration
+		void move_to_position(yarp::sig::Vector &left,			// Move the joints to a desired configuration
 					yarp::sig::Vector &right);			
-		void move_to_pose(const yarp::sig::Matrix &left,		// Move the hand to a desired pose
-				const yarp::sig::Matrix &right,
-				const double &time);			
+			
 		bool threadInit();						// Executed after start() and before run()
 		void run();							// Main control loop
 		void threadRelease();						// Executed after stop is called
 		void close();
+		void move_lateral(const double &distance);
+		
+		
 		yarp::sig::Vector get_positions(const std::string &which);	
 	
 	private:
 		// These are used to regulate the arm control
 		int controlMode;						// 1 = Joint, 2 = Cartesian, 3 = Hybrid
 		bool controlSwitch[2];						// Switch for activating control of the arms
-		double startTime, elapsedTime;				// For timing in the control
+		double startTime, elapsedTime;					// For timing in the control
 		
 		// These handle arm and joint kinematics
 		ArmController leftArm, rightArm;				// Handles Cartesian stuff
@@ -32,12 +33,12 @@ class DualArmController : virtual public yarp::os::PeriodicThread
 		// These are used in the Cartesian control
 		yarp::sig::Matrix J;						// Jacobian for both arms
 		yarp::sig::Matrix j;						// Jacobian for a single arm
-		yarp::sig::Vector xdot;					// Task velocities
+		yarp::sig::Vector xdot;						// Task velocities
 		
 		// Functions
 		yarp::sig::Matrix get_joint_weighting();			// Weight the joint motions
 		yarp::sig::Matrix get_pseudoinverse(const yarp::sig::Matrix &J,
-							const yarp::sig::Matrix &W);
+						   const yarp::sig::Matrix &W);
 		
 		
 
@@ -69,31 +70,107 @@ void DualArmController::move_to_position(yarp::sig::Vector &left, yarp::sig::Vec
 	start(); // Go immediately to threadInit() 
 }
 
-/******************** Move the hand to a desired configuration ********************/
-void DualArmController::move_to_pose(const yarp::sig::Matrix &left, const yarp::sig::Matrix &right, const double &time)
+/******************** Cartesian Control Functions ********************/
+void DualArmController::move_lateral(const double &distance)
 {
-	if(isRunning()) stop();						// Stop any threads that are running
+/*      // Debugging
+	yarp::sig::Matrix H = this->leftArm.get_pose();			// Get the pose of the left hand
+	yInfo() << "Left hand pose:";
+	std::cout <<  H.toString() << std::endl;
+	H[1][3] -= distance;						// Move hand inward
+	yInfo() << "Target:";
+	std::cout << H.toString() << std::endl;
 	
-	if(left.rows() != 0)	this->controlSwitch[0] = true;		// Turn on left arm control
-	else			this->controlSwitch[0] = false;
+	yarp::sig::Vector error = this->leftArm.get_pose_error(H);
+	yInfo() << "Error vector:";
+	std::cout << error.toString() << std::endl;
 	
-	if(right.rows() != 0)	this->controlSwitch[1] = true;		// Turn on right arm control
-	else			this->controlSwitch[1] = false;
+	yarp::sig::Matrix J = this->leftArm.get_jacobian();
+	yInfo() << "Jacobian:";
+	std::cout << J.toString() << std::endl;
 	
+	yarp::sig::Matrix W(10,10);
+	W.eye();
+	yarp::sig::Matrix invJ = get_pseudoinverse(J,W);
+	yInfo() << "Pseudoinverse:";
+	std::cout << invJ.toString() << std::endl;
 	
-	if(this->controlSwitch[0] + this->controlSwitch[1] == false)		// Both switches are off for some reason!
+	yarp::sig::Vector qdot = invJ*error;
+	yInfo() << "Joint velocities:";
+	std::cout << qdot.toString() << std::endl;
+*/
+	if(isRunning()) stop();						// Stop any control threads running
+	this->controlMode = 2;						// Change to Cartesian control mode
+	
+	// Set the left hand control
+	yarp::sig::Matrix T = this->leftArm.get_pose();			// Get the current left hand pose
+	T[1][3] -= distance;						// Move it over to the right(?)
+	this->leftArm.set_cartesian_trajectory(T,3.0);			// Set a new trajectory
+	this->controlSwitch[0] = true;
+	
+	// Set the right hand control
+	T = this->rightArm.get_pose();
+	T[1][3] += distance;
+	this->rightArm.set_cartesian_trajectory(T,3.0);
+	this->controlSwitch[1] = true;
+	
+	run(); // Go immediately to initThread()
+	
+/* TEST THE CONTROL
+	this->J.zero();						// Clear the Jacobian
+	
+	this->elapsedTime = 0.5;
+	
+	if(this->controlSwitch[0])				// Left arm control active
 	{
-		yError("DualArmController::move_to_position() : Both arguments have null inputs!");
-	}
-	else
-	{
-		this->controlMode = 2;						// Use to trigger Cartesian control mode
-		update_state();						// This will update the kinematic chain
-		if(this->controlSwitch[0]) this->leftArm.set_cartesian_trajectory(left, time); // Set new Cartesian trajectories
-		if(this->controlSwitch[1]) this->rightArm.set_cartesian_trajectory(right, time);
+		yInfo("Left arm is active!");
+		
+		// Solve the Cartesian control part
+		this->xdot.setSubvector(0,this->leftArm.cartesian_control(this->elapsedTime));
+		
+		// Construct the Jacobian
+		this->j = this->leftArm.get_jacobian();			// Get the Jacobian for the current state
+		this->J.setSubmatrix(this->j.submatrix(0,5,0,6),0,0);	// Allocate Jacobian for arm control
+		this->J.setSubmatrix(this->j.submatrix(0,5,7,9),0,14);	// Allocate the Jacobian for the torso
 	}
 	
-	start(); // Go immediately to threadInit();
+	if(this->controlSwitch[1])				// Right arm control active
+	{
+		yInfo("Right arm is active!");
+		
+		// Solve the Cartesian control part
+		this->xdot.setSubvector(6,this->rightArm.cartesian_control(this->elapsedTime));
+		
+		// Construct the Jacobian
+		this->j = this->leftArm.get_jacobian();		// Get the Jacobian for the current state
+		this->J.setSubmatrix(this->j.submatrix(0,5,0,6),6,7); // Allocate Jacobian for arm control
+		this->J.setSubmatrix(this->j.submatrix(0,5,7,9),6,14); // Allocate the Jacobian for the torso
+	}
+	
+	yInfo("Task velocity vector:");
+	std::cout << this->xdot.toString() << std::endl;
+	
+	yInfo("Jacobian:");
+	std::cout << this->J.toString() << std::endl;
+	
+	// Solve differential inverse kinematics
+	yarp::sig::Matrix W = get_joint_weighting();		// NOTE: This is already the inverse!
+	yarp::sig::Matrix invJ = get_pseudoinverse(J,W);		// Get the weighted pseudoinverse Jacobian
+	//yarp::sig::Matrix I(17,17);
+	//I.zero();
+	
+	yInfo("Pseudoinverse:");
+	std::cout << invJ.toString() << std::endl;
+	
+	yInfo("J*invJ:");
+	std::cout << (this->J*invJ).toString() << std::endl;
+	
+	yarp::sig::Vector qdot = invJ*xdot;// + (I - invJ*J)*rdot;
+	qdot *= 180/M_PI;					// Convert to deg/s
+	
+	yInfo("Joint velocities:");
+	std::cout << qdot.toString() << std::endl;
+*/
 }
 
 /******************** Executed just before run() ********************/
@@ -107,9 +184,9 @@ bool DualArmController::threadInit()
 /******************** MAIN CONTROL LOOP ********************/
 void DualArmController::run()
 {
-	update_state();									// Update the joint state information
+	update_state();								// Update the joint state information
 	
-	this->elapsedTime = yarp::os::Time::now() - this->startTime;				// Update the time in the control loop
+	this->elapsedTime = yarp::os::Time::now() - this->startTime;		// Update the time in the control loop
 	
 	// Solve the relevant control
 	switch(this->controlMode)
@@ -117,19 +194,21 @@ void DualArmController::run()
 		case 1: // Joint control
 		{
 			// this->torso.joint_control(this->elapsedTime);
-			if(controlSwitch[0]) this->leftArm.joint_control(this->elapsedTime);
-			if(controlSwitch[1]) this->rightArm.joint_control(this->elapsedTime);
+			if(this->controlSwitch[0]) this->leftArm.joint_control(this->elapsedTime);
+			if(this->controlSwitch[1]) this->rightArm.joint_control(this->elapsedTime);
 			
 			break;
 		}
 		case 2: // Cartesian control
 		{
-			this->J.zero();							// Clear the Jacobian
+			this->J.zero();						// Clear the Jacobian
 			
-			if(controlSwitch[0])							// Left arm control active
-			{
+			this->elapsedTime = yarp::os::Time::now() - this->startTime;
+			
+			if(this->controlSwitch[0])				// Left arm control active
+			{	
 				// Solve the Cartesian control part
-				this->xdot.subVector(0,5) = this->leftArm.cartesian_control(this->elapsedTime);
+				this->xdot.setSubvector(0,this->leftArm.cartesian_control(this->elapsedTime));
 				
 				// Construct the Jacobian
 				this->j = this->leftArm.get_jacobian();			// Get the Jacobian for the current state
@@ -137,28 +216,33 @@ void DualArmController::run()
 				this->J.setSubmatrix(this->j.submatrix(0,5,7,9),0,14);	// Allocate the Jacobian for the torso
 			}
 			
-			if(controlSwitch[1])							// Right arm control active
+			if(this->controlSwitch[1])				// Right arm control active
 			{
 				// Solve the Cartesian control part
-				this->xdot.subVector(0,5) = this->rightArm.cartesian_control(this->elapsedTime);
+				this->xdot.setSubvector(6,this->rightArm.cartesian_control(this->elapsedTime));
 				
 				// Construct the Jacobian
-				this->j = this->leftArm.get_jacobian();			// Get the Jacobian for the current state
-				this->J.setSubmatrix(this->j.submatrix(0,5,0,6),6,7);	// Allocate Jacobian for arm control
-				this->J.setSubmatrix(this->j.submatrix(0,5,7,9),6,14);	// Allocate the Jacobian for the torso
+				this->j = this->leftArm.get_jacobian();		// Get the Jacobian for the current state
+				this->J.setSubmatrix(this->j.submatrix(0,5,0,6),6,7); // Allocate Jacobian for arm control
+				this->J.setSubmatrix(this->j.submatrix(0,5,7,9),6,14); // Allocate the Jacobian for the torso
 			}
-			
+						
 			// Solve differential inverse kinematics
-			yarp::sig::Matrix W = get_joint_weighting();				// NOTE: This is already the inverse!
-			yarp::sig::Matrix invJ = get_pseudoinverse(J,W);			// Get the weighted pseudoinverse Jacobian
+			yarp::sig::Matrix W = get_joint_weighting();		// NOTE: This is already the inverse!
+			yarp::sig::Matrix invJ = get_pseudoinverse(J,W);		// Get the weighted pseudoinverse Jacobian
 			//yarp::sig::Matrix I(17,17);
 			//I.zero();
-			yarp::sig::Vector qdot = invJ*xdot;// + (I - invJ*J)*rdot;
 			
-			// Send the commands to the joints
-			if(controlSwitch[0]) this->leftArm.move_at_speed(qdot.subVector(0,6));	// Left arm joints
-			if(controlSwitch[1]) this->rightArm.move_at_speed(qdot.subVector(7,13));	// Right arm joints
-			this->torso.move_at_speed(qdot.subVector(14,16));				// Torso joints
+			yarp::sig::Vector qdot = invJ*xdot;// + (I - invJ*J)*rdot;
+			qdot *= 180/M_PI;					// Convert to deg/s
+			
+			//yInfo("Joint velocity:");
+			//std::cout << qdot.toString() << std::endl;
+			
+			// Send commands to the motors
+			this->leftArm.move_at_speed(qdot.subVector(0,6));
+			this->rightArm.move_at_speed(qdot.subVector(7,13));
+			this->torso.move_at_speed(qdot.subVector(14,16));
 			
 			break;
 		}
@@ -247,25 +331,25 @@ yarp::sig::Matrix DualArmController::get_pseudoinverse(const yarp::sig::Matrix &
 			}
 		}
 		
-		return invWJt*invA*U.transposed();					// Return the complete inversion
+		return invWJt*invA*U.transposed();			// Return the complete inversion
 	}
 }
 
 /******************** Get and set new joint state information ********************/
 void DualArmController::update_state()
 {
-	this->torso.get_encoder_values();						// Read encoders on torso joints
+	this->torso.get_encoder_values();				// Read encoders on torso joints
 	this->leftArm.get_encoder_values();
 	this->rightArm.get_encoder_values();
 	
-	yarp::sig::Vector dof(10);							// We need to put this in to the iCubArm objects
+	yarp::sig::Vector dof(10);					// We need to put this in to the iCubArm objects
 	
-	for(int i = 0; i < 3; i++) dof[i] = torso.q[2-i];				// Torso joint order is opposite to the arms
+	for(int i = 0; i < 3; i++) dof[i] = torso.q[2-i];		// Torso joint order is opposite to the arms
 	
-	for(int i = 0; i < 7; i++) dof[i+3] = this->leftArm.q[i];			// Assign the left arm joint angles to the stack
+	for(int i = 0; i < 7; i++) dof[i+3] = this->leftArm.q[i];	// Assign the left arm joint angles to the stack
 	this->leftArm.set_angles(dof);
 	
-	for(int i = 0; i < 7; i++) dof[i+3] = this->rightArm.q[i];			// Assign the right arm joint angles to the stack
+	for(int i = 0; i < 7; i++) dof[i+3] = this->rightArm.q[i];	// Assign the right arm joint angles to the stack
 	this->rightArm.set_angles(dof);
 }
 
@@ -283,6 +367,8 @@ DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
 	this->leftArm.configure("/local/left", "/icubSim/left_arm", "left");
 	this->rightArm.configure("/local/right", "/icubSim/right_arm", "right");
 	this->torso.configure_drivers("/local/torso", "/icubSim/torso", "torso", 3);
+	
+	update_state();							// Set the 
 }
 
 /******************** Close the device drivers ********************/
@@ -296,7 +382,7 @@ void DualArmController::close()
 /******************** Get the joint positions for a single arm ********************/
 yarp::sig::Vector DualArmController::get_positions(const std::string &which)
 {
-	if(which.compare("left"))		return this->leftArm.q;
+	if(which.compare("left"))	return this->leftArm.q;
 	else if(which.compare("right"))	return this->rightArm.q;
 	else
 	{
