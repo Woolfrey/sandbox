@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -DNDEBUG  -rdynamic CMakeFiles/sandbox-haiku.dir/src/haiku.cpp.o  -o bin/sandbox-haiku 
