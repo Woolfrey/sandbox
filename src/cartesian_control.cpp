@@ -4,11 +4,11 @@
 #include <yarp/os/RpcServer.h>
 
 // Pre-defined positions
-yarp::sig::Vector home({-30.0, 30.0,  00.0,  45.0, 00.0, 00.0, 00.0});		// Starting pose
-yarp::sig::Vector receive({-50.0, 00.0, 00.0, 50.0, -60.0, 00.0, 00.0});		// Extend arm out, palm up
+yarp::sig::Vector home_arm({-30.0, 30.0,  00.0,  45.0, 00.0, 00.0, 00.0});	// Starting pose
+yarp::sig::Vector home_torso({0.0, 0.0, 0.0});					
+yarp::sig::Vector receive({-50.0, 00.0, 00.0, 50.0, -60.0, 00.0, 00.0});	// Extend arm out, palm up
 yarp::sig::Vector shake({-50.0, 20.0, 00.0, 50.0, 00.0, 00.0, 00.0});		// Extend arm out, palm sideways
 yarp::sig::Vector wave({-30.0, 50.0, -30.0, 105.0, 30.0, 00.0, 00.0});		// Raise hand up
-
 
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
@@ -34,67 +34,72 @@ int main(int argc, char *argv[])
 		port.read(input, true);						// Get any commands over the network
 		command = input.toString();					// Convert to a string
 		
-		// Shut down the robot
-		if(command == "close")
+		/******************** Interfacing ********************/
+
+		if(command == "close") // Shut down the robot
 		{
 			output.addString("Arrivederci");
-			active = false;						// Shut down the while loop
+			active = false;							// Shut down the while loop
+		}
+		else if(command == "read") // Read the current joint positions
+		{
+			yarp::sig::Vector q = controller.get_positions("torso");	// Temporary storage location
+			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]); 	// Return rounded values
+		}
+		else if(command == "test")
+		{
+			controller.blah();
+			output.addString("Correta?");
 		}
 		
-		// Move both hands up
-		if(command == "freeze")
-		{
-			controller.move_to_position(wave, wave);
-			output.addString("Gasp!");
-		}
+		/******************** Joint-level control ********************/
 		
-		// Move hands to a grasp position
-		if(command == "grasp")
+		else if(command == "freeze") // Put both hands up
 		{
-			controller.move_to_position(shake, shake);
+			controller.move_to_position(wave, wave, home_torso);
+			output.addString("Fermata");
+		}
+		else if(command == "grasp") // Move both hands to a grasp position
+		{
+			controller.move_to_position(shake, shake, home_torso);
 			output.addString("Pronto");
 		}
-		
-		// Move the arms back to the starting position
-		if(command == "home")
+		else if(command == "home") // Move the arms back to the start
 		{
-			controller.move_to_position(home, home);
+			controller.move_to_position(home_arm, home_arm, home_torso);
 			output.addString("Casa");
 		}
-		
-		// Move the hands inwards
-		if(command == "in")
+		else if(command == "shake") // Extend one arm
 		{
-			controller.move_lateral(0.1);
-			output.addString("Closer");
-		}
-		if(command == "out")
-		{
-			controller.move_lateral(-0.1);
-			output.addString("Further");
-		}
-		
-		// Get the current joint positions
-		if(command == "read")
-		{
-			yarp::sig::Vector q = controller.get_positions("left");	// Temporary storage location
-			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]); // Return rounded values
-		}
-		
-		// Extend one arm to shake hands
-		if(command == "shake")
-		{
-			controller.move_to_position(home, shake);
+			controller.move_to_position(home_arm, shake, home_torso);
 			output.addString("Piacere");
 		}
-		
-		// Wave one hand
-		if(command == "wave")
+		else if(command == "wave") // Wave one hand
 		{
-			controller.move_to_position(home, wave);			// Raise 1 hand to wave
+			controller.move_to_position(home_arm, wave, home_torso);	// Raise 1 hand to wave
 			output.addString("Ciao");
 		}
 		
+		/******************** Cartesian-level control ********************/
+		
+		else if(command == "up")
+		{
+			controller.move_vertical(0.1);
+			output.addString("Su");
+		}
+		else if(command == "down")
+		{
+			controller.move_vertical(-0.1);
+			output.addString("Giu");
+		}
+		
+		/*******************************************************************/
+		
+		else
+		{
+			output.addString("Che cosa?");
+		}
+				
 		port.reply(output);
 	}
 		
