@@ -51,13 +51,18 @@ int main(int argc, char *argv[])
 			controller.blah();
 			output.addString("Correta?");
 		}
+		else if(command == "stop") // Stop control threads
+		{
+			controller.stop();
+			output.addString("Fermata");
+		}
 		
 		/******************** Joint-level control ********************/
 		
 		else if(command == "freeze") // Put both hands up
 		{
 			controller.move_to_position(wave, wave, home_torso);
-			output.addString("Fermata");
+			output.addString("No");
 		}
 		else if(command == "grasp") // Move both hands to a grasp position
 		{
@@ -81,16 +86,13 @@ int main(int argc, char *argv[])
 		}
 		
 		/******************** Cartesian-level control ********************/
-		
-		else if(command == "up")
+		else if(command == "left")
 		{
-			controller.move_vertical(0.1);
-			output.addString("Su");
+			controller.move_lateral(0.25);
 		}
-		else if(command == "down")
+		else if(command == "right")
 		{
-			controller.move_vertical(-0.1);
-			output.addString("Giu");
+			controller.move_lateral(0.25);
 		}
 		
 		/*******************************************************************/
