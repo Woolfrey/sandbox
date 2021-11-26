@@ -19,8 +19,8 @@
 		
 		<model name="iCub">
 			<include>
-				<uri>model://iCubGazeboV2_5_visuomanip</uri>
-				<pose>0.0 0.0 0.63 0.0 0.0 3.141593</pose>
+				<uri>model://iCubGazeboV3_feet_fixed</uri>
+				<pose>0.0 0.0 clea0.7075 0.0 0.0 0.0</pose>
 			</include>
 		</model>
 		
