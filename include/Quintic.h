@@ -31,7 +31,7 @@ class Quintic
 				const float &time);*/
 		
 	private:
-		int type = 100;						// 1 = Real numbers, 2 = Angle-Axis
+		int type = 100;							// 1 = Real numbers, 2 = Angle-Axis
 		
 		float a, b, c;							// Polynomial coefficients
 		
@@ -49,7 +49,11 @@ class Quintic
 };										// Need a semicolon after a class declaration
 
 /******************** Empty constructor ********************/
-Quintic::Quintic()
+Quintic::Quintic() : 	type(1),
+			t1(0.0),
+			t2(5.0),
+			p1(yarp::sig::Vector({0.0, 0.0, 0.0})),
+			p2(yarp::sig::Vector({1.0, 1.0, 1.0}))
 {
 	// Worker bees can leave.
 	// Even drones can fly away.
