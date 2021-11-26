@@ -135,32 +135,25 @@ void DualArmController::move_to_position(yarp::sig::Vector &left, yarp::sig::Vec
 }
 
 /******************** Cartesian Control Functions ********************/
-void DualArmController::move_vertical(const double &distance)
+void DualArmController::move_lateral(const double &distance)
 {
-	if(isRunning()) stop();							// Stop any control threads that are running
+	if(isRunning()) stop();							// Stop any control threads
 	
 	this->controlMode = 2;							// Switch case for Cartesian control
 	
-	update_state();								// Ensure current state is correct
+	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
 	
-	// Left arm
-	yarp::sig::Matrix H = this->leftArm.get_pose();				// Current pose of left hand
-	
-	yInfo("Here is the current pose:");
+	yInfo("Current pose of the left hand:");
 	std::cout << H.toString() << std::endl;
 	
-	H[2][3] += distance;							// Add distance to the z-direction
+	H[1][3] += distance;							// Offset the y-position
 	
-	yInfo("Here is the new pose:");
+	yInfo("Final desired pose of the left hand:");
 	std::cout << H.toString() << std::endl;
 	
-	this->leftArm.set_cartesian_trajectory(H, 5.0);
-	this->controlSwitch[0] = true;
+	this->leftArm.set_cartesian_trajectory(H, 5.0);				// Set the internal trajectory object
 	
-	this->controlSwitch[1] = false;
-	
-	run();	
-	
+	start();								// Go immediately to initThread();
 }
 
 /******************** Executed just before run() ********************/
@@ -191,10 +184,21 @@ void DualArmController::run()
 			break;
 		}
 		case 2: // Cartesian control
-		{
+		{			
+			//yarp::sig::Matrix pos(4,4);
+			//yarp::sig::Vector vel(6), acc(6);	
+			//this->leftArm.trajectory.get_state(pos, vel, acc, this->elapsedTime);
+			//yInfo() << "Desired pose at time " << elapsedTime << ":";
+			//std::cout << pos.toString() << std::endl;
+
+			//yInfo() << "Desired velocity at time " << this->elapsedTime << ":";
+			//std::cout << vel.toString() << std::endl;
+		
+			yarp::sig::Vector lol = this->leftArm.get_cartesian_control(this->elapsedTime);
+			yInfo() << "Pose error at time " << this->elapsedTime << ":";
+			std::cout << lol.toString() << std::endl;
+/*
 			this->J.zero();							// Clear the Jacobian
-			
-			this->elapsedTime = yarp::os::Time::now() - this->startTime;
 			
 			if(this->controlSwitch[0])					// Left arm control active
 			{	
@@ -231,6 +235,7 @@ void DualArmController::run()
 			this->leftArm.move_at_speed(qdot.subVector(0,6));
 			this->rightArm.move_at_speed(qdot.subVector(7,13));
 			this->torso.move_at_speed(qdot.subVector(14,16));
+*/
 			
 			break;
 		}
@@ -333,7 +338,7 @@ void DualArmController::update_state()
 }
 
 /******************** Constructor ********************/
-DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
+DualArmController::DualArmController() : yarp::os::PeriodicThread(0.5)
 {
 	// Resize and set matrices accordingly
 	this->J.resize(12,17);
@@ -353,7 +358,8 @@ DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
 /******************** Close the device drivers ********************/
 void DualArmController::close()
 {
-	this->leftArm.close();
+	stop();									// Stop control threads
+	this->leftArm.close();							// Close device drivers
 	this->rightArm.close();
 	this->torso.close();
 }
@@ -361,7 +367,7 @@ void DualArmController::close()
 /******************** Get the gradient of the manipulability measure ********************/
 yarp::sig::Vector DualArmController::get_manipulability_gradient()
 {
-	yarp::sig::Vector grad(17);					// Value to be returned
+	yarp::sig::Vector grad(17);						// Value to be returned
 
 	return grad;
 }
