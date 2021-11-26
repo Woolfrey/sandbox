@@ -25,7 +25,6 @@ class ArmController : public MultiJointController
 		
 		void set_angles(yarp::sig::Vector &input) {this->arm.setAng(input*M_PI/180);}		
 		
-	private:
 		CartesianTrajectory trajectory;						// Self explanatory
 		
 		iCub::iKin::iCubArm arm;						// iCubArm object
@@ -58,35 +57,15 @@ yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 
 	yarp::sig::Matrix H = this->arm.getH();						// Get the pose of the hand relative to the body
 	
-	this->pos = yarp::math::SE3inv(H)*pos;						// Convert desired pose to hand frame
+	this->axisAngle = yarp::math::dcm2axis(this->pos.submatrix(0,2,0,3)*H.submatrix(0,2,0,2).transposed());
 	
-	this->axisAngle = yarp::math::dcm2axis(pos);					// Get the axis-angle from the rotation component
-	if(this->axisAngle[3] > M_PI)							// If angle is greater than 180 degrees...
-	{
-		this->axisAngle[3] = 2*M_PI - this->axisAngle[3];			// ... Take the shorter path ...
-		for(int i = 0; i < 3; i++) this->axisAngle[i] *= -1;			// ... And flip the axis to match?
-	}
-	
-	// Compute the pose error
 	for(int i = 0; i < 3; i++)
 	{
-		this->err[i]	= this->pos[i][3];					// Translation component
-		this->err[i+3] 	= sin(0.5*this->axisAngle[3])*this->axisAngle[i];	// Equivalent to quaternion feedback?
+		this->err[i]	= this->pos[i][3] - H[i][3];				// Difference in translation
+		this->err[i+3]	= sin(0.5*this->axisAngle[3])*this->axisAngle[i];	// Quaternion feedback?
 	}
 	
-	yarp::sig::Vector temp(6);
-	
-	// Rotate the velocity vector
-	for(int i = 0; i < 3; i++)
-	{
-		for(int j = 0; j < 3; j++)
-		{
-			temp[i] 	+= H[j][i]*this->vel[j];			// Rotate linear component from body to hand
-			temp[i+3]	+= H[j][i]*this->vel[j+3];			// Rotate angular component from body to hand
-		}
-	}
-	
-	return temp + 0.9*this->err;
+	return this->err;
 }
 
 
