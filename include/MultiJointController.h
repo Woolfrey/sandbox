@@ -1,26 +1,28 @@
-#include <Quintic.h>									// Custom trajectory class
-#include <yarp/dev/ControlBoardInterfaces.h>						// Communicates with motor controllers on the robot?
-#include <yarp/dev/PolyDriver.h>							// Device driver class
+#include <Quintic.h>								// Custom trajectory class
+#include <yarp/dev/ControlBoardInterfaces.h>					// Communicates with motor controllers on the robot?
+#include <yarp/dev/PolyDriver.h>						// Device driver class
 #include <yarp/os/LogStream.h>							// yarp::Info() and the like
-#include <yarp/os/Property.h>								// Don't know exactly what this does
+#include <yarp/os/Property.h>							// Don't know exactly what this does
 
 class MultiJointController
 {
 	public:
-		MultiJointController(){};						// Default constructor
+		MultiJointController(){};					// Default constructor
 		
-		void configure_drivers(const std::string &local_port_name,		// Configure communication with robot
+		void configure_drivers(const std::string &local_port_name,	// Configure communication with robot
 					const std::string &remote_port_name,
 					const std::string &_name,
 					const int &number_of_joints);
 					
-		bool get_encoder_values();						// Get new state information
+		bool get_encoder_values();					// Get new state information
 		
-		void close() { this->driver.close();}					// Close the drivers
+		double get_joint_weight(const int &j);
+		
+		void close() { this->driver.close();}				// Close the drivers
 		
 		void set_joint_trajectory(yarp::sig::Vector &position);		// Set a new joint trajectory object
 		
-		void move_at_speed(const yarp::sig::Vector &speed);			// Send velocity commands to each individual joint
+		void move_at_speed(const yarp::sig::Vector &speed);		// Send velocity commands to each individual joint
 		
 		void joint_control(const double &time);				// Solve control to track trajectory					
 		
@@ -28,36 +30,53 @@ class MultiJointController
 		
 	private:
 		// Variables used internally in this class
-		int n;									// Number of joints
-		std::string name;							// Unique identifier
+		int n;								// Number of joints
+		std::string name;						// Unique identifier
 		yarp::sig::Vector pos, vel, acc, ctrl;				// Joint state and control vectors
 
-		Quintic trajectory;							// Joint trajectory object
+		Quintic trajectory;						// Joint trajectory object
 		
 		
 	   	// These interface with the hardware
     		yarp::dev::IControlLimits*	limits;				// Joint limits?
-		yarp::dev::IControlMode*	mode;					// Sets the control mode of the motor
-		yarp::dev::IEncoders*		encoder;				// Joint position values (in degrees)
-		yarp::dev::IVelocityControl*	controller;				// Motor-level velocity controller
+		yarp::dev::IControlMode*	mode;				// Sets the control mode of the motor
+		yarp::dev::IEncoders*		encoder;			// Joint position values (in degrees)
+		yarp::dev::IVelocityControl*	controller;			// Motor-level velocity controller
 		yarp::dev::PolyDriver		driver;				// Device driver
 		
-};											// Semicolon needed after class declaration
+};										// Semicolon needed after class declaration
 
 /******************** Get new joint encoder information ********************/
 bool MultiJointController::get_encoder_values()
 {
-	// TO DO: Get joint velocities
+	bool success = true;
 	
-	if(this->encoder->getEncoders(this->q.data()))
+	for(int i = 0; i < this->n; i++)
 	{
-		return true;
+		success &= this->encoder->getEncoder(i, &this->q[i]);
+		success &= this->encoder->getEncoderSpeed(i, &this->qdot[i]);
 	}
-	else
-	{
-		yError() << "ArmController::update_state() : Could not obtain encoder values for " << this->name + ".";
-		return false;
-	}
+
+	if(!success) yError() << "ArmController::update_state() : Could not obtain encoder values for " << this->name + ".";
+	
+	return success;
+}
+
+/******************** Get the penalty term for avoiding joint limits ********************/
+double MultiJointController::get_joint_weight(const int &j)
+{
+	double qMin, qMax;
+	this->limits->getLimits(j, &qMin, &qMax);					// Get the lower and upper limits for this joint
+	
+	double range = qMax - qMin;							// Distance between joints
+	
+	double upper = qMax - this->q[j];						// Distance to upper limit
+	double lower = this->q[j] - qMin;						// Distance from lower limit
+	
+	double dpdq = pow(upper,-2) - pow(lower, -2);					// Partial derivative of the penalty function
+	
+	if(dpdq*this->qdot[j] > 0)	return pow(1/upper + 1/lower - 4/range + 1, -1); // This is actually the INVERSE of the penalty function
+	else				return 1.0;
 }
 
 /******************** Set a new joint trajectory ********************/
@@ -71,31 +90,31 @@ void MultiJointController::set_joint_trajectory(yarp::sig::Vector &position)
 	else
 	{
 		// Ensure the target is within joint limits
-		double qMin, qMax;							// Upper and lower joint limits
+		double qMin, qMax;						// Upper and lower joint limits
 		for(int i = 0; i < this->n; i++)
 		{
-			this->limits->getLimits(i, &qMin, &qMax);			// Get the limits for ith joint
-			if(position[i] > qMax)	position[i] = qMax - 0.01;		// Just under the joint limit
-			if(position[i] < qMin) position[i] = qMin + 0.01;		// Just above the joint limit
+			this->limits->getLimits(i, &qMin, &qMax);		// Get the limits for ith joint
+			if(position[i] > qMax)	position[i] = qMax - 0.01;	// Just under the joint limit
+			if(position[i] < qMin) position[i] = qMin + 0.01;	// Just above the joint limit
 		}
 		
 		// Compute optimal time scaling
-		double vMin, vMax;							// Speed limits
-		double dt, dq;								// Distance in time, space
+		double vMin, vMax;						// Speed limits
+		double dt, dq;							// Distance in time, space
 		double endTime;							// To be computed here
 		
-		get_encoder_values();							// Get the current joint state
+		get_encoder_values();						// Get the current joint state
 		for(int i = 0; i < this->n; i++)
 		{
 			dq = position[i] - this->q[i];				// Distance to target
-			this->limits->getVelLimits(i, &vMin, &vMax);			// Get velocity limits for ith joint
-			if(dq >= 0)	dt = (15*dq)/(8*vMax);				// Time to cover distance at max speed			
+			this->limits->getVelLimits(i, &vMin, &vMax);		// Get velocity limits for ith joint
+			if(dq >= 0)	dt = (15*dq)/(8*vMax);			// Time to cover distance at max speed			
 			else		dt = (15*dq)/(8*vMin);					
 			if(dt > endTime) endTime = dt;				// Update based on maximum time
 		}
-		endTime *= 1.5;							// Make the time a bit longer
+		endTime *= 2.0;							// Make the time a bit longer
 		
-		this->trajectory = Quintic(this->q, position, 0, endTime);		// New trajectory
+		this->trajectory = Quintic(this->q, position, 0, endTime);	// New trajectory
 	}	
 }
 
@@ -155,7 +174,6 @@ void MultiJointController::configure_drivers(	const std::string &local_port_name
 		//yInfo() << yarp::dev::Drivers::factory().toString().c_str();
 		totalSuccess == false;
 	}
-	//else	yInfo() << "Successfully configured the device driver for" << this->name + ".";
 
 	// Next, configure the joint controllers
 	if(!this->driver.view(this->controller))
@@ -177,8 +195,6 @@ void MultiJointController::configure_drivers(	const std::string &local_port_name
 			this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); // CHANGE THIS?
 			this->controller->velocityMove(i, 0.0);					// Ensure initial velocity is zero
 		}
-		
-		//yInfo() << "Successfully configured velocity control of" << this->name + ".";
 	}
 	
 	// Now try and obtain joint limits
@@ -187,7 +203,6 @@ void MultiJointController::configure_drivers(	const std::string &local_port_name
 		yError() << "Unable to obtain joint limits for" << this->name + ".";
 		totalSuccess = false;
 	}
-	//else					yInfo() << "Successfully obtained limits for" << this->name + ".";
 	
 	// Finally, configure the encoders
 	if(!this->driver.view(this->encoder))
@@ -201,15 +216,14 @@ void MultiJointController::configure_drivers(	const std::string &local_port_name
 		{
 			if(this->encoder->getEncoders(this->q.data()))				// Try and get initial values
 			{
-				//yInfo() << "Successfully configured the encoder for" << this->name + ".";
-				break;									// This should break the loop
+				break;								// This should break the loop
 			}
 			if(i == 5)
 			{
 				yError() << "Could not obtain encoder values for" << this->name << "in 5 attempts.";
 				totalSuccess = false;
 			}
-			yarp::os::Time::delay(0.02);							// wait a little bit and try again
+			yarp::os::Time::delay(0.05);						// wait a little bit and try again
 		}
 	}
 	if(totalSuccess) yInfo() << "Successfully configured drivers for the" << this->name + ".";
