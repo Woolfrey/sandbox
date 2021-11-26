@@ -1,40 +1,41 @@
 #include <iostream>
-#include <CartesianTrajectory.h>						// Custom trajectory object
-#include <iCub/iKin/iKinFwd.h>							// iCub::iKin::iCubArm object
-#include <MultiJointController.h>						// Custom low-level interface with robot
+#include <CartesianTrajectory.h>							// Custom trajectory object
+#include <iCub/iKin/iKinFwd.h>								// iCub::iKin::iCubArm object
+#include <MultiJointController.h>							// Custom low-level interface with robot
 
 class ArmController : public MultiJointController
 {
 	public:
-		ArmController() {};						// Empty constructor
+		ArmController() {};							// Empty constructor
 		
 		void configure(const std::string &local_port_name,
 				const std::string &remote_port_name,
 				const std::string &_name);
 				
-		void set_cartesian_trajectory(const yarp::sig::Matrix &desired,	// Set new Cartesian trajectory
+		void set_cartesian_trajectory(const yarp::sig::Matrix &desired,		// Set new Cartesian trajectory
 						const double &time);
 						
-		yarp::sig::Vector cartesian_control(const double &time);		// Track the internal trajectory
+		yarp::sig::Vector get_cartesian_control(const double &time);		// Track the internal trajectory
 		
+		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();}	// Get the Jacobian for the current pose
 		
-		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();} // Get the Jacobian for the current pose
-		yarp::sig::Matrix get_pose() {return this->arm.getH();}		// Get the pose of the hand
+		yarp::sig::Matrix get_pose() {return this->arm.getH();}			// Get the pose of the hand
+		
 		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired);
 		
 		void set_angles(yarp::sig::Vector &input) {this->arm.setAng(input*M_PI/180);}		
 		
 	private:
-		CartesianTrajectory trajectory;					// Self explanatory
+		CartesianTrajectory trajectory;						// Self explanatory
 		
-		iCub::iKin::iCubArm arm;					// iCubArm object
+		iCub::iKin::iCubArm arm;						// iCubArm object
 		
-		yarp::sig::Matrix pos;						// Desired pose for the hand
+		yarp::sig::Matrix pos;							// Desired pose for the hand
 		
-		yarp::sig::Vector vel, acc, err, angleAxis;			// Desired velocity, acceleration, pose error
+		yarp::sig::Vector vel, acc, err, axisAngle;				// Desired velocity, acceleration, pose error
 
-};										// Semicolon needed after a class declaration
-
+};											// Semicolon needed after a class declaration
+	
 /******************** Set new Cartesian trajectory to track ********************/
 void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired, const double &time)
 {
@@ -50,26 +51,44 @@ void ArmController::set_cartesian_trajectory(const yarp::sig::Matrix &desired, c
 	}
 }
 
-/******************** Solve the Cartesian control to follow the trajectory ********************/
-yarp::sig::Vector ArmController::cartesian_control(const double &time)
+/******************** Solves the task velocities in the hand frame ********************/
+yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 {
-	// NOTE TO SELF: If there's a problem with orientation feedback, it's probably here!
+	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state in the body(?) frame
 
-	this->trajectory.get_state(this->pos, this->vel, this->acc, time);	// Get desired state for current time
-/*	
-	yInfo() << "Time:" << time;
-	yInfo() << "Desired pose:";
-	std::cout << this->pos.toString() << std::endl;
+	yarp::sig::Matrix H = this->arm.getH();						// Get the pose of the hand relative to the body
 	
-	yInfo() << "Desired velocity:";
-	std::cout << this->vel.toString() << std::endl;
+	this->pos = yarp::math::SE3inv(H)*pos;						// Convert desired pose to hand frame
 	
-	yInfo() << "Desired acceleration:";
-	std::cout << this->acc.toString() << std::endl;
-*/
-
-	return this->vel + 2*get_pose_error(this->pos);
+	this->axisAngle = yarp::math::dcm2axis(pos);					// Get the axis-angle from the rotation component
+	if(this->axisAngle[3] > M_PI)							// If angle is greater than 180 degrees...
+	{
+		this->axisAngle[3] = 2*M_PI - this->axisAngle[3];			// ... Take the shorter path ...
+		for(int i = 0; i < 3; i++) this->axisAngle[i] *= -1;			// ... And flip the axis to match?
+	}
+	
+	// Compute the pose error
+	for(int i = 0; i < 3; i++)
+	{
+		this->err[i]	= this->pos[i][3];					// Translation component
+		this->err[i+3] 	= sin(0.5*this->axisAngle[3])*this->axisAngle[i];	// Equivalent to quaternion feedback?
+	}
+	
+	yarp::sig::Vector temp(6);
+	
+	// Rotate the velocity vector
+	for(int i = 0; i < 3; i++)
+	{
+		for(int j = 0; j < 3; j++)
+		{
+			temp[i] 	+= H[j][i]*this->vel[j];			// Rotate linear component from body to hand
+			temp[i+3]	+= H[j][i]*this->vel[j+3];			// Rotate angular component from body to hand
+		}
+	}
+	
+	return temp + 0.9*this->err;
 }
+
 
 /******************** Get the pose error between the current and desired pose ********************/
 yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired)
@@ -89,11 +108,12 @@ yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired
 		for(int i = 0; i < 3; i++)
 		{
 			error[i]	= desired[i][3] - actual[i][3];
-			error[i+3]	= angleAxis[3]*axisAngle[i];
+			error[i+3]	= axisAngle[3]*axisAngle[i];
 		}
 	}
 	return error;
 }
+
 /******************** Configure the left arm ********************/
 void ArmController::configure(const std::string &local_port_name,
 				const std::string &remote_port_name,
@@ -104,13 +124,13 @@ void ArmController::configure(const std::string &local_port_name,
 	this->vel.resize(6);
 	this->acc.resize(6);
 	this->err.resize(6);
-	this->angleAxis.resize(4);
+	this->axisAngle.resize(4);
 
 	// Set the iCubArm object
-	this->arm = iCub::iKin::iCubArm(_name+"_v2");
+	this->arm = iCub::iKin::iCubArm(_name+"_v3");
 	this->arm.setAllConstraints(false);						// I don't know what this does
 	for(int i = 0; i < 3; i++) this->arm.releaseLink(i);				// Release all the torso joints for us
 	yInfo() << "This arm is the " << this->arm.getType() << " arm.";		// Inform the user
 	
-	configure_drivers(local_port_name, remote_port_name, _name+" arm", 7);	// We only need 7 joints in the arm
+	configure_drivers(local_port_name, remote_port_name, _name+" arm", 7);		// We only need 7 joints in the arm
 }
