@@ -88,12 +88,25 @@ int main(int argc, char *argv[])
 		/******************** Cartesian-level control ********************/
 		else if(command == "left")
 		{
-			controller.move_lateral(0.25);
+			controller.move_lateral(-0.2);
+			output.addString("Sinestra");
 		}
 		else if(command == "right")
 		{
-			controller.move_lateral(0.25);
+			controller.move_lateral(0.2);
+			output.addString("Destra");
 		}
+		else if(command == "up")
+		{
+			controller.move_vertical(0.2);
+			output.addString("Su");
+		}
+		else if(command == "down")
+		{
+			controller.move_vertical(-0.2);
+			output.addString("Giu");
+		}
+		
 		
 		/*******************************************************************/
 		
