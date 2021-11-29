@@ -57,15 +57,18 @@ yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 
 	yarp::sig::Matrix H = this->arm.getH();						// Get the pose of the hand relative to the body
 	
-	this->axisAngle = yarp::math::dcm2axis(this->pos.submatrix(0,2,0,3)*H.submatrix(0,2,0,2).transposed());
+	yarp::sig::Matrix R = H.submatrix(0,2,0,2);					// Get the rotation component
 	
-	for(int i = 0; i < 3; i++)
-	{
-		this->err[i]	= this->pos[i][3] - H[i][3];				// Difference in translation
-		this->err[i+3]	= sin(0.5*this->axisAngle[3])*this->axisAngle[i];	// Quaternion feedback?
-	}
+	yarp::sig::Vector ctrl(6);
 	
-	return this->err;
+	ctrl.setSubvector(0,R.transposed()*this->vel.subVector(0,2));				// Rotate?
+
+	yInfo("Desired velocity:");
+	std::cout << this->vel.toString() << std::endl;
+//	yInfo("Rotated:");
+//	std::cout << ctrl.toString() << std::endl;
+
+	return this->vel;
 }
 
 
@@ -109,7 +112,9 @@ void ArmController::configure(const std::string &local_port_name,
 	this->arm = iCub::iKin::iCubArm(_name+"_v3");
 	this->arm.setAllConstraints(false);						// I don't know what this does
 	for(int i = 0; i < 3; i++) this->arm.releaseLink(i);				// Release all the torso joints for us
-	yInfo() << "This arm is the " << this->arm.getType() << " arm.";		// Inform the user
+//	yInfo() << "This arm is the " << this->arm.getType() << " arm.";		// Inform the user
 	
 	configure_drivers(local_port_name, remote_port_name, _name+" arm", 7);		// We only need 7 joints in the arm
+	
+	
 }
