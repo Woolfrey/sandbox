@@ -143,17 +143,29 @@ void DualArmController::move_lateral(const double &distance)
 	
 	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
 	
-	yInfo("Current pose of the left hand:");
-	std::cout << H.toString() << std::endl;
-	
 	H[1][3] += distance;							// Offset the y-position
 	
-	yInfo("Final desired pose of the left hand:");
-	std::cout << H.toString() << std::endl;
+	this->leftArm.set_cartesian_trajectory(H, 3.0);				// Set the internal trajectory object
+	this->controlSwitch[0] = true;						// Activate left arm control
+	this->controlSwitch[1] = false;						// Ensure right is turned off
 	
-	this->leftArm.set_cartesian_trajectory(H, 5.0);				// Set the internal trajectory object
+	start(); // Go immediately to initThread();
+}
+void DualArmController::move_vertical(const double &distance)
+{
+	if(isRunning()) stop();							// Stop any control threads
 	
-	start();								// Go immediately to initThread();
+	this->controlMode = 2;							// Switch case for Cartesian control
+	
+	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
+	
+	H[2][3] += distance;							// Offset the y-position
+	
+	this->leftArm.set_cartesian_trajectory(H, 3.0);				// Set the internal trajectory object
+	this->controlSwitch[0] = true;						// Activate left arm control
+	this->controlSwitch[1] = false;						// Ensure right is turned off
+	
+	start(); // Go immediately to initThread();
 }
 
 /******************** Executed just before run() ********************/
@@ -185,20 +197,8 @@ void DualArmController::run()
 		}
 		case 2: // Cartesian control
 		{			
-			//yarp::sig::Matrix pos(4,4);
-			//yarp::sig::Vector vel(6), acc(6);	
-			//this->leftArm.trajectory.get_state(pos, vel, acc, this->elapsedTime);
-			//yInfo() << "Desired pose at time " << elapsedTime << ":";
-			//std::cout << pos.toString() << std::endl;
-
-			//yInfo() << "Desired velocity at time " << this->elapsedTime << ":";
-			//std::cout << vel.toString() << std::endl;
-		
-			yarp::sig::Vector lol = this->leftArm.get_cartesian_control(this->elapsedTime);
-			yInfo() << "Pose error at time " << this->elapsedTime << ":";
-			std::cout << lol.toString() << std::endl;
-/*
 			this->J.zero();							// Clear the Jacobian
+			this->xdot.zero();						// Clear the task vector
 			
 			if(this->controlSwitch[0])					// Left arm control active
 			{	
@@ -234,8 +234,7 @@ void DualArmController::run()
 			// Send commands to the motors
 			this->leftArm.move_at_speed(qdot.subVector(0,6));
 			this->rightArm.move_at_speed(qdot.subVector(7,13));
-			this->torso.move_at_speed(qdot.subVector(14,16));
-*/
+			this->torso.move_at_speed(yarp::sig::Vector({qdot[16], qdot[15], qdot[14]})); // NOTE: TORSO JOINTS ARE IN REVERSE
 			
 			break;
 		}
@@ -271,7 +270,8 @@ yarp::sig::Matrix DualArmController::get_joint_weighting()
 	// the MultiJointController class and send the result here.
 
 	yarp::sig::Matrix W(17,17);						// Value to be returned
-	
+	W.eye();
+
 	for(int i = 0; i < 7; i++)
 	{
 		W[i][i]		= this->leftArm.get_joint_weight(i);
@@ -338,7 +338,7 @@ void DualArmController::update_state()
 }
 
 /******************** Constructor ********************/
-DualArmController::DualArmController() : yarp::os::PeriodicThread(0.5)
+DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
 {
 	// Resize and set matrices accordingly
 	this->J.resize(12,17);
@@ -351,8 +351,9 @@ DualArmController::DualArmController() : yarp::os::PeriodicThread(0.5)
 	this->leftArm.configure("/local/left", "/icubSim/left_arm", "left");
 	this->rightArm.configure("/local/right", "/icubSim/right_arm", "right");
 	this->torso.configure_drivers("/local/torso", "/icubSim/torso", "torso", 3);
-	
 	update_state();
+	
+	for(int i = 0; i < 2; i++) this->controlSwitch[i] = false;		// Default starting value
 }
 
 /******************** Close the device drivers ********************/
