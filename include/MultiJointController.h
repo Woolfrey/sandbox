@@ -95,7 +95,7 @@ void MultiJointController::set_joint_trajectory(yarp::sig::Vector &position)
 		{
 			this->limits->getLimits(i, &qMin, &qMax);		// Get the limits for ith joint
 			if(position[i] > qMax)	position[i] = qMax - 0.01;	// Just under the joint limit
-			if(position[i] < qMin) position[i] = qMin + 0.01;	// Just above the joint limit
+			if(position[i] < qMin)	position[i] = qMin + 0.01;	// Just above the joint limit
 		}
 		
 		// Compute optimal time scaling
@@ -112,7 +112,7 @@ void MultiJointController::set_joint_trajectory(yarp::sig::Vector &position)
 			else		dt = (15*dq)/(8*vMin);					
 			if(dt > endTime) endTime = dt;				// Update based on maximum time
 		}
-		endTime *= 2.0;							// Make the time a bit longer
+		endTime = 2.0;							// Make the time a bit longer
 		
 		this->trajectory = Quintic(this->q, position, 0, endTime);	// New trajectory
 	}	
@@ -123,7 +123,7 @@ void MultiJointController::joint_control(const double &time)
 {
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
 	
-	this->ctrl = vel + 2.0*(this->pos - this->q);					// Feedforward + feedback control
+	this->ctrl = vel + 0.1*(this->pos - this->q);					// Feedforward + feedback control
 	
 	move_at_speed(this->ctrl);							// Send commands to joints
 }
@@ -192,8 +192,8 @@ void MultiJointController::configure_drivers(	const std::string &local_port_name
 		for(int i = 0; i < this->n; i++)
 		{
 			this->mode->setControlMode(i, VOCAB_CM_VELOCITY);				// Set the motor in velocity mode
-			this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); // CHANGE THIS?
-			this->controller->velocityMove(i, 0.0);					// Ensure initial velocity is zero
+			this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); 	// CHANGE THIS?
+			this->controller->velocityMove(i, 0.0);						// Ensure initial velocity is zero
 		}
 	}
 	
