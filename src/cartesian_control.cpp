@@ -4,11 +4,11 @@
 #include <yarp/os/RpcServer.h>
 
 // Pre-defined positions
-yarp::sig::Vector home_arm({-30.0, 30.0,  00.0,  45.0, 00.0, 00.0, 00.0});	// Starting pose
+yarp::sig::Vector home_arm({-30*M_PI/180, 30*M_PI/180, 0, 45*M_PI/180, 0, 0, 0});	// Starting pose
 yarp::sig::Vector home_torso({0.0, 0.0, 0.0});					
-yarp::sig::Vector receive({-50.0, 00.0, 00.0, 50.0, -60.0, 00.0, 00.0});	// Extend arm out, palm up
-yarp::sig::Vector shake({-50.0, 20.0, 00.0, 50.0, 00.0, 00.0, 00.0});		// Extend arm out, palm sideways
-yarp::sig::Vector wave({-30.0, 50.0, -30.0, 105.0, 30.0, 00.0, 00.0});		// Raise hand up
+yarp::sig::Vector receive({-50*M_PI/180, 0, 0, 50*M_PI/180, -60*M_PI/180, 0, 0});	// Extend arm out, palm up
+yarp::sig::Vector shake({-50*M_PI/180, 20*M_PI/180, 0, 50*M_PI/180, 0, 0, 0});		// Extend arm out, palm sideways
+yarp::sig::Vector wave({-30*M_PI/180, 50*M_PI/180, -30*M_PI/180, 105*M_PI/180, 30*M_PI/180, 0, 0});		// Raise hand up
 
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
@@ -23,38 +23,40 @@ int main(int argc, char *argv[])
 	yarp::os::Bottle input;							// Store information from user input
 	yarp::os::Bottle output;						// Store information to send to user
 	std::string command;							// Response message, command from user
-		
+	
 	// Run the control loop
-	bool active = true;
+	bool controlActive = true;
 	
-	while(active)
+	while(controlActive)
 	{
-		output.clear();							// Clear any previous
-	
-		port.read(input, true);						// Get any commands over the network
+		output.clear();							// Clear any previous messages
+		
+		port.read(input, true);						// Read messages over the network
 		command = input.toString();					// Convert to a string
 		
 		/******************** Interfacing ********************/
-
 		if(command == "close") // Shut down the robot
 		{
 			output.addString("Arrivederci");
-			active = false;							// Shut down the while loop
+			controlActive = false;
 		}
-		else if(command == "read") // Read the current joint positions
+		else if(command == "print joints")
 		{
-			yarp::sig::Vector q = controller.get_positions("torso");	// Temporary storage location
-			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]); 	// Return rounded values
+			output.addString("Ecco qui");
+			controller.update_state();
 		}
-		else if(command == "test")
+		else if(command == "stop")
 		{
-			controller.blah();
-			output.addString("Correta?");
-		}
-		else if(command == "stop") // Stop control threads
-		{
-			controller.stop();
 			output.addString("Fermata");
+			controller.stop();
+		}
+		else if(command == "left pose")
+		{
+			controller.print_pose("left");
+		}
+		else if(command == "right pose")
+		{
+			controller.print_pose("right");
 		}
 		
 		/******************** Joint-level control ********************/
@@ -88,6 +90,102 @@ int main(int argc, char *argv[])
 		/******************** Cartesian-level control ********************/
 		else if(command == "left")
 		{
+			controller.move_lateral(0.1);
+			output.addString("Sinestra");
+		}
+		else if(command == "right")
+		{
+			controller.move_lateral(-0.1);
+			output.addString("Destra");
+		}
+		else if(command == "up")
+		{
+			controller.move_vertical(0.1);
+			output.addString("Su");
+		}
+		else if(command == "down")
+		{
+			controller.move_vertical(-0.1);
+			output.addString("Giu");
+		}
+		/****************************************************************/
+		
+		else
+		{
+			output.addString("Che cosa?");
+		}
+		
+		port.reply(output);						// Send a message to the user
+	}
+	
+	controller.close();
+	return 0;
+}
+/*
+	// Run the control loop
+	bool active = true;
+	
+	while(active)
+	{
+		output.clear();							// Clear any previous
+	
+		port.read(input, true);						// Get any commands over the network
+		command = input.toString();					// Convert to a string
+		
+		/******************** Interfacing ********************
+
+		if(command == "close") // Shut down the robot
+		{
+			output.addString("Arrivederci");
+			active = false;							// Shut down the while loop
+		}
+		else if(command == "read") // Read the current joint positions
+		{
+			yarp::sig::Vector q = controller.get_positions("torso");	// Temporary storage location
+			for(int i = 0; i < q.size(); i++) output.addFloat64(q[i]); 	// Return rounded values
+		}
+		else if(command == "test")
+		{
+			controller.blah();
+			output.addString("Correta?");
+		}
+		else if(command == "stop") // Stop control threads
+		{
+			controller.stop();
+			output.addString("Fermata");
+		}
+		
+		/******************** Joint-level control ********************
+		
+		else if(command == "freeze") // Put both hands up
+		{
+			controller.move_to_position(wave, wave, home_torso);
+			output.addString("No");
+		}
+		else if(command == "grasp") // Move both hands to a grasp position
+		{
+			controller.move_to_position(shake, shake, home_torso);
+			output.addString("Pronto");
+		}
+		else if(command == "home") // Move the arms back to the start
+		{
+			controller.move_to_position(home_arm, home_arm, home_torso);
+			output.addString("Casa");
+		}
+		else if(command == "shake") // Extend one arm
+		{
+			controller.move_to_position(home_arm, shake, home_torso);
+			output.addString("Piacere");
+		}
+		else if(command == "wave") // Wave one hand
+		{
+			controller.move_to_position(home_arm, wave, home_torso);	// Raise 1 hand to wave
+			output.addString("Ciao");
+		}
+		
+		/******************** Cartesian-level control ********************
+		else if(command == "left")
+		{
 			controller.move_lateral(-0.2);
 			output.addString("Sinestra");
 		}
@@ -108,7 +206,7 @@ int main(int argc, char *argv[])
 		}
 		
 		
-		/*******************************************************************/
+		/*******************************************************************
 		
 		else
 		{
@@ -122,3 +220,4 @@ int main(int argc, char *argv[])
 		
 	return 0;									// No problems with main
 }
+*/
