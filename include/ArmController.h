@@ -84,7 +84,7 @@ yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 //	yInfo("Here is the pose error:");
 //	std::cout << error.toString() << std::endl;
 	
-	return vel + 0.2*error;
+	return vel + 2.0*error;
 	
 /*	
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state in the body(?) frame
