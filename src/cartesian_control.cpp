@@ -4,11 +4,16 @@
 #include <yarp/os/RpcServer.h>
 
 // Pre-defined positions
-yarp::sig::Vector home_arm({-30*M_PI/180, 30*M_PI/180, 0, 45*M_PI/180, 0, 0, 0});	// Starting pose
-yarp::sig::Vector home_torso({0.0, 0.0, 0.0});					
-yarp::sig::Vector receive({-50*M_PI/180, 0, 0, 50*M_PI/180, -60*M_PI/180, 0, 0});	// Extend arm out, palm up
-yarp::sig::Vector shake({-50*M_PI/180, 20*M_PI/180, 0, 50*M_PI/180, 0, 0, 0});		// Extend arm out, palm sideways
-yarp::sig::Vector wave({-30*M_PI/180, 50*M_PI/180, -30*M_PI/180, 105*M_PI/180, 30*M_PI/180, 0, 0});		// Raise hand up
+double d2r = M_PI/180;
+yarp::sig::Vector home_torso({0.0, 0.0, 0.0});			
+		
+yarp::sig::Vector home_arm({-30*d2r, 30*d2r,  00*d2r, 45*d2r,  00*d2r,  00*d2r, 0});
+
+yarp::sig::Vector receive( {-50*d2r, 10*d2r,  00*d2r, 40*d2r, -60*d2r,  20*d2r, 10*d2r});
+
+yarp::sig::Vector shake(   {-50*d2r, 40*d2r,  65*d2r, 45*d2r, -70*d2r, -20*d2r, 0*d2r});
+
+yarp::sig::Vector wave(    {-30*M_PI/180, 50*M_PI/180, -30*M_PI/180, 105*M_PI/180, 30*M_PI/180, 0, 0});
 
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
@@ -81,6 +86,12 @@ int main(int argc, char *argv[])
 			controller.move_to_position(home_arm, shake, home_torso);
 			output.addString("Piacere");
 		}
+		else if(command == "receive")
+		{
+			controller.move_to_position(receive, receive, home_torso);
+			output.addString("Grazie");
+		}
+		
 		else if(command == "wave") // Wave one hand
 		{
 			controller.move_to_position(home_arm, wave, home_torso);	// Raise 1 hand to wave
@@ -107,6 +118,23 @@ int main(int argc, char *argv[])
 		{
 			controller.move_vertical(-0.1);
 			output.addString("Giu");
+		}
+		else if(command == "in")
+		{	controller.move_in_out(0.05);
+			output.addString("Vicino");
+		}
+		else if(command == "out")
+		{
+			controller.move_in_out(-0.05);
+			output.addString("Lontano");
+		}
+		else if(command == "forward")
+		{
+			controller.move_horizontal(0.1);
+		}
+		else if(command == "backward")
+		{
+			controller.move_horizontal(-0.1);
 		}
 		/****************************************************************/
 		
