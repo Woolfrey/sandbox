@@ -53,6 +53,7 @@ class DualArmController : public yarp::os::PeriodicThread
 
 void DualArmController::print_pose(const std::string &which)
 {
+	update_state();
 	if(which == "left")
 	{
 		yarp::sig::Matrix H = this->leftArm.get_pose();
@@ -100,19 +101,19 @@ void DualArmController::update_state()
 	this->rightArm.read_encoders();
 	
 	// Put the values in to the iCub::iKin::iCubArm object
-	yarp::sig::Vector temp(10);						// Need to put this in to the iCubArm object
+	yarp::sig::Vector q(10);						// Need to put this in to the iCubArm object
 	
-	yarp::sig::Vector blah = this->torso.get_joint_positions();		// Joint positions for the torso
-	for(int i = 0; i < 3; i++) temp[7+i] = blah[2-i];			// Torso joints are in reverse order?
+	yarp::sig::Vector temp = this->torso.get_joint_positions();		// Get the joint positions for the torso
+	for(int i = 0; i < 3; i++) q[i] = temp[2-i];				// Torso joints are in reverse order
 	
-	temp.setSubvector(0,this->leftArm.get_joint_positions());		// Add the left arm joints
-	this->leftArm.set_joint_angles(temp);					// Assign them to the iCubArm object
+	q.setSubvector(3, this->leftArm.get_joint_positions());			// Append the left arm joints
+	this->leftArm.set_joint_angles(q);					// Assign them to the iCubArm object
 	
 //	yInfo() << "Here is the joint position vector for the left-arm kinematic chain:";
 //	std::cout << temp.toString() << std::endl;
 	
-	temp.setSubvector(0, this->rightArm.get_joint_positions());
-	this->rightArm.set_joint_angles(temp);
+	q.setSubvector(3, this->rightArm.get_joint_positions());			// Overwrite with the right arm joints
+	this->rightArm.set_joint_angles(q);					// Assign them to the iCubArm object
 	
 //	yInfo() << "Here is the joint position vector for the right-arm kinematic chain:";
 //	std::cout << temp.toString() << std::endl;
@@ -229,9 +230,7 @@ void DualArmController::run()
 				this->xdot.setSubvector(0,this->leftArm.get_cartesian_control(this->elapsedTime));
 				
 				// Construct the Jacobian
-				this->j = this->leftArm.get_jacobian();			// Get the Jacobian for the current state
-				this->J.setSubmatrix(this->j.submatrix(0,5,0,6),0,0);	// Allocate Jacobian for arm control
-				this->J.setSubmatrix(this->j.submatrix(0,5,7,9),0,14);	// Allocate the Jacobian for the torso
+				this->J.setSubmatrix(this->leftArm.get_jacobian(),0,0);	// Effect on left hand
 			}
 			
 			if(this->rightControl)						// Right arm control active
@@ -241,19 +240,13 @@ void DualArmController::run()
 				
 				// Construct the Jacobian
 				this->j = this->rightArm.get_jacobian();		// Get the Jacobian for the current state
-				this->J.setSubmatrix(this->j.submatrix(0,5,0,6),6,7);	// Allocate Jacobian for arm control
-				this->J.setSubmatrix(this->j.submatrix(0,5,7,9),6,14);	// Allocate the Jacobian for the torso
+				
+				this->J.setSubmatrix(this->j.submatrix(0,5,0,2),6,0);	// Assign torso effect for right hand
+				this->J.setSubmatrix(this->j.submatrix(0,5,3,9),6,10);	// Assign arm effect for the right hand
 			}
 			
-			yarp::sig::Matrix bigR(6,6);
-			
-			yarp::sig::Matrix H = this->leftArm.get_pose();
-			bigR.setSubmatrix(H.submatrix(0,2,0,2),0,0);
-			
-			H = this->rightArm.get_pose();
-			bigR.setSubmatrix(H.submatrix(0,2,0,2),3,3);
-			
-			//J = bigR.transposed()*J;
+//			yInfo("Here is the Jacobian:");
+//			std::cout << this->J.toString() << std::endl;
 			
 			// Solve differential inverse kinematics
 			yarp::sig::Matrix W = get_joint_weighting();			// NOTE: This is already the inverse!
@@ -265,11 +258,11 @@ void DualArmController::run()
 			
 //			yInfo("Here is the desired Cartesian velocity:");
 //			std::cout << this->xdot.toString() << std::endl;
-			
-			// Send commands to the motors
-			this->leftArm.move_at_speed(qdot.subVector(0,6));
-			this->rightArm.move_at_speed(qdot.subVector(7,13));
-			this->torso.move_at_speed(yarp::sig::Vector({qdot[16], qdot[15], qdot[14]})); // NOTE: TORSO JOINTS ARE IN REVERSE
+
+			// Send the commands to the motors
+			this->torso.move_at_speed(yarp::sig::Vector({qdot[2], qdot[1], qdot[0]})); // IN REVERSE ORDER
+			this->leftArm.move_at_speed(qdot.subVector(3,9));
+			this->rightArm.move_at_speed(qdot.subVector(10,16));
 /*			
 			yarp::sig::Vector blah(17);
 			blah.setSubvector(0,this->leftArm.get_joint_velocities());
