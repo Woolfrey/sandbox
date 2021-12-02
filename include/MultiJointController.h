@@ -97,9 +97,9 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 	{
 		for(int i = 0; i < this->n; i++)
 		{
-			this->mode->setControlMode(i, VOCAB_CM_VELOCITY);				// Set the motor in velocity mode
-			this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); 	// CHANGE THIS?
-			this->controller->velocityMove(i, 0.0);						// Ensure initial velocity is zero
+			this->mode->setControlMode(i, VOCAB_CM_VELOCITY);			// Set the motor in velocity mode
+			this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); // CHANGE THIS?
+			this->controller->velocityMove(i, 0.0);					// Ensure initial velocity is zero
 		}
 	}
 	
@@ -151,7 +151,7 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 			yarp::os::Time::delay(0.05);						// wait a little bit and try again
 		}
 		
-		this->q = temp*M_PI/180;							// Make sure the values are in radians
+		this->q = temp*M_PI/180;					// Make sure the values are in radians
 	}
 	if(totalSuccess) yInfo() << "Successfully configured drivers for the" << this->name + ".";
 }
