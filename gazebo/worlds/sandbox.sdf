@@ -38,7 +38,7 @@
 		
 		<include>
      			<uri>model://box</uri>
-			<pose>0.35 0 0.68 0 0 0</pose>
+			<pose>0.3 0 0.68 0 0 0</pose>
 		</include>
 				
 	</world>
