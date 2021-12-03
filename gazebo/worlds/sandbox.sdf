@@ -17,19 +17,19 @@
      			<uri>model://ground_plane</uri>
 		</include>
 		
-		<model name="iCub">
+		<!--model name="iCub">
 			<include>
 				<uri>model://iCubGazeboV2_5_visuomanip</uri>
 				<pose>0.0 0.0 0.65 0.0 0.0 3.1516</pose>
 			</include>
-		</model>
+		</model-->
 		
-		<!--model name="iCub">
+		<model name="iCub">
 			<include>
 				<uri>model://iCubGazeboV3_feet_fixed</uri>
 				<pose>0.0 0.0 0.01 0.0 0.0 0.0</pose>
 			</include>
-		</model-->
+		</model>
 		
 		<include>
      			<uri>model://table</uri>
