@@ -41,7 +41,7 @@ void ArmController::configure(const std::string &local_port_name,
 //	this->acc.resize(6);
 	
 	// Set the iCubArm object
-	this->arm = iCub::iKin::iCubArm(_name+"_v2");
+	this->arm = iCub::iKin::iCubArm(_name+"_V3");
 	this->arm.setAllConstraints(false);						// I don't know what this does
 	for(int i = 0; i < 3; i++) this->arm.releaseLink(i);				// Release all the torso joints for us
 	
@@ -84,7 +84,7 @@ yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 //	yInfo("Here is the pose error:");
 //	std::cout << error.toString() << std::endl;
 	
-	return vel + 2.0*error;
+	return vel + 3.0*error;
 	
 /*	
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state in the body(?) frame
