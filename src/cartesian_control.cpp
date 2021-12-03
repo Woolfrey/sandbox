@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 		else if(command == "left")
 		{
 			controller.move_lateral(0.1);
-			output.addString("Sinestra");
+			output.addString("Sinistra");
 		}
 		else if(command == "right")
 		{
