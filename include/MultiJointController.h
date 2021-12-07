@@ -27,16 +27,21 @@ class MultiJointController
 		
 		void move_at_speed(const yarp::sig::Vector speed);		// Send velocity commands to the motors
 		
-		double get_joint_weight(const int &j);
+		double get_joint_weight(const int &i);				// Penalty function for joint limit avoidance
+		
+		void get_speed_limits(const int &i, double &lower, double &upper); // Get the velocity constaint for a single joint
 		
 	private:
+		double hertz = 100;						// Default control frequency
+		
 		int n;								// Number of joints
 		
 		Quintic trajectory;						// Joint-level trajectory generator
 		
 		std::string name;						// Identifies this object
 		
-		yarp::sig::Vector q, qdot, qMin, qMax, range;			// Position, velocity, joint limits
+		yarp::sig::Vector q, qdot;					// Joint position and velocity
+		yarp::sig::Vector qMin, qMax, range, vLim;			// Position and velocity limits
 		yarp::sig::Vector pos, vel, acc;				// Desired state for control purposes
 		
 	   	// These interface with the hardware
@@ -63,6 +68,7 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 	this->qMin.resize(this->n);							// Lower joint limits
 	this->qMax.resize(this->n);							// Upper joint limits
 	this->range.resize(this->n);							// Range between joint limits
+	this->vLim.resize(this->n);							// Joint speed limit
 	this->pos.resize(this->n);							// Desired joint position vector
 	this->vel.resize(this->n);							// Desired joint velocity vector
 	this->acc.resize(this->n);							// Desired joint acceleration vector
@@ -113,20 +119,17 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 	else
 	{
 		// Save them internally in radians for later use
+		double vMin;									// Not really used
 		for(int i = 0; i < this->n; i++)
 		{
 			this->limits->getLimits(i, &this->qMin[i], &this->qMax[i]);
+			this->limits->getVelLimits(i, &vMin, &this->vLim[i]);			// vMin is always zero
 		}
 		
-//		yInfo() << "Here are the joint limits for the " << this->name << " in deg:";
-//		std::cout << this->qMin.toString() << std::endl;
-		
-		this->qMin *= M_PI/180;
+		this->qMin *= M_PI/180;								// Convert to radians
 		this->qMax *= M_PI/180;
 		this->range = this->qMax - this->qMin;						// This is used in joint limit avoidance
-		
-//		yInfo() << "And here they are in rad:";
-//		std::cout << this->qMin.toString() << std::endl;
+		this->vLim *= M_PI/180;								// Convert to rad/s
 	}
 	
 	// Finally, configure the encoders
@@ -137,20 +140,20 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 	}
 	else
 	{
-		yarp::sig::Vector temp(this->n);						// Temporary storage location
+		yarp::sig::Vector temp(this->n);				// Temporary storage location
 		
 		for(int i = 0; i < 5; i++)
 		{
-			if(this->encoder->getEncoders(temp.data()))				// Try and get initial values
+			if(this->encoder->getEncoders(temp.data()))		// Try and get initial values
 			{
-				break;								// This should break the loop
+				break;						// This should break the loop
 			}
 			if(i == 5)
 			{
 				yError() << "Could not obtain encoder values for" << this->name << "in 5 attempts.";
 				totalSuccess = false;
 			}
-			yarp::os::Time::delay(0.05);						// wait a little bit and try again
+			yarp::os::Time::delay(0.05);				// wait a little bit and try again
 		}
 		
 		this->q = temp*M_PI/180;					// Make sure the values are in radians
@@ -165,34 +168,21 @@ bool MultiJointController::read_encoders()
 	
 	for(int i = 0; i < this->n; i++)
 	{
-		success &= this->encoder->getEncoder(i, &this->q[i]);
-		success &= this->encoder->getEncoderSpeed(i, &this->qdot[i]);
+		success &= this->encoder->getEncoder(i, &this->q[i]);		// Read the position
+		success &= this->encoder->getEncoderSpeed(i, &this->qdot[i]);	// Read the velocity
 	}
 	
-//	yInfo() << "Here are the joint angles for " << this->name << " in degrees:";
-//	std::cout << this->q.toString() << std::endl;
+	this->q *= M_PI/180;							// Convert to radians
+	this->qdot *= M_PI/180;							// Convert to rad/s
 	
-	this->q *= M_PI/180;
-	this->qdot *= M_PI/180;
-	
-//	yInfo() << " And here they are in radians:";
-//	std::cout << this->q.toString() << std::endl;
+	// Sensor noise can make the values go over the limits.
+	for(int i = 0; i < this->n; i++)
+	{
+		if(this->q[i] > this->qMax[i])		this->q[i] = this->qMax[i];
+		else if(this->q[i] < this->qMin[i])	this->q[i] = this->qMin[i];
+	}
 
 	if(!success) yError() << "ArmController::update_state() : Could not obtain encoder values for " << this->name + ".";
-	
-/*	for(int i = 0; i < this->n; i++)
-	{
-		if(this->q[i] > this->qMax[i])
-		{
-			this->q[i] = this->qMax[i];
-			yError() << "Joint " << i << " for the " << this->name << " is above the joint limit!";
-		}
-		else if(this->q[i] < this->qMin[i])
-		{
-			this->q[i] = this->qMin[i];
-			yError() << "Joint " << i << " for the " << this->name << " is below the joint limit!";
-		}
-	} */
 	
 	return success;
 }
@@ -215,20 +205,15 @@ void MultiJointController::set_joint_trajectory(yarp::sig::Vector &target)
 		}
 		
 		// Compute optimal time scaling
-		double vMin, vMax, dt, dq;
+		double dt, dq;
 		double endTime = 2.0;
 		
 		for(int i = 0; i < this->n; i++)
-		{	
+		{
 			dq = abs(target[i] - this->q[i]);				// Distance to target
-			this->limits->getVelLimits(i, &vMin, &vMax);			// Get velocity limits for ith joint
-			vMax *= M_PI/180;
-			if(dq >= 0)	dt = (15*dq)/(8*vMax);				// Optimal time scaling at max velocity
-			
-			if(dt > endTime) endTime = dt;					// Overwrite based on largest observed time
+			if(dq > 0)	dt = (15*dq)/(8*this->vLim[i]);			// Optimal time scaling at peak velocity
+			if(dt > endTime) endTime = dt;
 		}
-		
-		//yInfo() << "Total trajectory time: " << endTime;
 		
 		this->trajectory = Quintic(this->q, target, 0.0, endTime);
 	}
@@ -238,9 +223,6 @@ void MultiJointController::set_joint_trajectory(yarp::sig::Vector &target)
 void MultiJointController::joint_control(const double &time)
 {
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
-	
-//	yInfo() << "Here is the desired position for time " << time <<":";
-//	std::cout << this->pos.toString() << std::endl;
 
 	move_at_speed(this->vel + 5.0*(this->pos - this->q));				// Send commands to the motors
 }
@@ -260,22 +242,39 @@ void MultiJointController::move_at_speed(const yarp::sig::Vector speed)
 }
 
 /******************** Get the penalty term for avoiding joint limits ********************/
-double MultiJointController::get_joint_weight(const int &j)
+double MultiJointController::get_joint_weight(const int &i)
 {
-	double upper = this->qMax[j] - this->q[j];					// Distance to upper limit
-	double lower = this->q[j] - this->qMin[j];					// Distance to lower limit
-	double dpdq = pow(upper,-2) - pow(lower,-2);					// Partial derivative of penalty function
+	double upper = this->qMax[i] - this->q[i];					// Distance to upper limit
+	double lower = this->q[i] - this->qMin[i];					// Distance to lower limit
 	
-	if(dpdq*this->qdot[j] > 0)							// Moving toward a joint limit
+//	double dpdq = pow(upper,-2) - pow(lower,-2);					// Partial derivative of penalty function
+	double dpdq = (pow(this->range[i],2)*(2*this->q[i] - this->qMax[i] - this->qMin[i]))/
+			(4*pow(upper,2)*pow(lower,2));
+	
+	if(dpdq*this->qdot[i] > 0)							// Moving toward a joint limit
 	{
-		double penalty = this->range[j]/(upper*lower)-4/this->range[j]+1;	// Penalize joint motion toward limits
+//		double penalty = this->range[i]/(upper*lower)-4/this->range[i]+1;	// Penalize joint motion toward limits
+		double penalty = pow(this->range[i],2)/(4*upper*lower);
 		if(penalty < 0)
 		{
-//			yError() << "Penalty term for joint " << j << " of the " << this->name << ": " << penalty
-//			<< " Joint position: " << this->qMin[j] << " " << this->q[j] << " " << this->qMax[j];
+			yError() << "Penalty term for joint " << i + 1 << " of the " << this->name << ": " << penalty
+			<< " Joint position: " << this->qMin[i] << " " << this->q[i] << " " << this->qMax[i];
 			return 0;							// Something went wrong and the joint is outside its limits?
 		}
 		else	return 1/penalty;						// Returns the INVERSE when moving toward a limit
 	}
 	else		return 1.0;							// Free movement away from the limits
+}
+
+void MultiJointController::get_speed_limits(const int &i, double &lower, double &upper)
+{
+	double temp = this->hertz*(this->qMax[i] - this->q[i]);				// Maximum speed to reach upper joint limit
+	
+	if(this->vLim[i] > temp)	upper = temp;
+	else				upper = this->vLim[i];
+	
+	temp = this->hertz*(this->qMin[i] - this->q[i]);				// Minimum speed to reach lower limit
+	
+	if(-1*this->vLim[i] < temp)	lower = temp;
+	else				lower = -1*this->vLim[i];
 }
