@@ -74,7 +74,7 @@ yarp::sig::Vector ArmController::get_cartesian_control(const double &time)
 	
 	this->trajectory.get_state(pos, vel, acc, time);
 		
-	return vel + 3.0*(get_pose_error(pos, this->arm.getH()));			// Feedforward + feedback
+	return vel + 2.0*(get_pose_error(pos, this->arm.getH()));			// Feedforward + feedback
 
 }
 
