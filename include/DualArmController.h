@@ -6,6 +6,8 @@
 	THINGS TO FIX:
 		- No switch to deactivate torso control - could be a problem
 		  with null inputs.
+		  
+		- Need to set a variable for the control frequency
 */
 
 class DualArmController : public yarp::os::PeriodicThread
@@ -26,8 +28,11 @@ class DualArmController : public yarp::os::PeriodicThread
 		void move_in_out(const double &distance);
 		void move_horizontal(const double &distance);
 		
-		void get_joint_weighting();
-		
+		void get_joint_weighting();				// For joint limit avoidance in RMRC
+		void update_speed_limits();				// Get the min. and max. velocity for each joint
+		void scale_vector(yarp::sig::Vector &input,
+				const yarp::sig::Vector ref);		// Scale a vector based on speed limits
+
 		yarp::sig::Matrix get_pseudoinverse(const yarp::sig::Matrix &J,
 							const yarp::sig::Matrix &W);
 							
@@ -48,8 +53,8 @@ class DualArmController : public yarp::os::PeriodicThread
 		ArmController leftArm, rightArm;			// Handles kinematics for the arms
 		MultiJointController torso;				// Handles joint communication and control for torso
 		
-		yarp::sig::Vector xdot, q, qdot;
-		yarp::sig::Matrix J, j, W;
+		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, vMin, vMax;
+		yarp::sig::Matrix J, j, W, I, N;
 		
 };									// Semicolon needed after class declaration
 
@@ -69,19 +74,27 @@ void DualArmController::print_pose(const std::string &which)
 		std::cout << H.toString() << std::endl;
 	}
 }
-		
 
 /******************** Constructor ********************/
 DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
 {
-	// Resize vectors, matrices
-	this->J.resize(12,17);							// Jacobian for both arms
-	this->W.resize(17,17);							// Weighting matrix for RMRC
-		this->W.eye();							// Start as identity matrix
-	this->xdot.resize(12);							// Task velocity vector
-	this->qdot.resize(17);							// Joint velocity vector for both arms
-	this->q.resize(10);							// Joint position for a single kinematic chain
-	
+	// Resize vectors
+	this->xdot.resize(12);						// Task velocity vector
+	this->qdot.resize(17);						// Joint velocity vector for both arms
+	this->qdot_R.resize(17);					// Range space task
+	this->qdot_N.resize(17);					// Null space task
+	this->q.resize(10);						// Joint position for a single kinematic chain
+	this->vMin.resize(17);						// Minimum speed for the joints
+	this->vMax.resize(17);						// Maximum speed for the joints
+		
+	// Resize matrices
+	this->J.resize(12,17);						// Jacobian for both arms
+	this->W.resize(17,17);						// Weighting matrix for RMRC
+		this->W.eye();
+	this->I.resize(17,17);						// Identity matrix
+		this->I.eye();
+	this->N.resize(17,17);						// Null space projection matrix				
+
 	// Configure the device drivers for different parts of the robot
 	this->leftArm.configure("/local/left", "/icubSim/left_arm", "left");
 	this->rightArm.configure("/local/right", "/icubSim/right_arm", "right");
@@ -115,6 +128,9 @@ void DualArmController::update_state()
 		
 		this->q.setSubvector(3, this->rightArm.get_joint_positions());	// Overwrite with the right arm joints
 		this->rightArm.set_joint_angles(q);				// Assign them to the iCubArm object
+		
+//		yInfo("Joint position vector for right arm:");
+//		std::cout << this->q.toString() << std::endl;
 	}
 	else	close();							// There was a problem, so shut down the robot
 }
@@ -294,9 +310,39 @@ void DualArmController::run()
 			
 //			yInfo("Here is the weighting matrix:");
 //			for(int i = 0; i < 17; i++) std::cout << W[i][i] << " ";
-//			std::cout << std::endl;			
+//			std::cout << std::endl;		
+
+			update_speed_limits();
+			this->qdot_R = invJ*this->xdot;					// Range space task
 			
-			this->qdot = invJ*this->xdot;// + (I - invJ*J)*rdot;
+			double s = 1.0;
+			for(int i = 0; i < 17; i++)
+			{
+				if(this->qdot_R[i] >= this->vMax[i] && this->vMax[i]/this->qdot_R[i] <= s)
+				{
+					s = 0.99*this->vMax[i]/this->qdot_R[i];
+				}
+				else if(this->qdot_R[i] <= this->vMin[i] && this->vMin[i]/this->qdot_R[i] <= s)
+				{
+					s = 0.99*this->vMin[i]/this->qdot_R[i];
+				}
+			}
+			qdot_R *= s;
+			
+//			yInfo() << "Scalar: " << s << " Speeds:";
+//			std::cout << this->vMax.toString() << std::endl;
+//			std::cout << this->qdot_R.toString() << std::endl;
+//			std::cout << this->vMin.toString() << std::endl;
+			
+			
+			// N = I - invJ*J;						// Null space projection matrix
+			// this->qdot_N = N * qdot_d;					// Project desired velocity on null space
+			this->qdot_N.zero();						// Null space task
+			
+			this->qdot = this->qdot_R + this->qdot_N;			// Combined
+			
+			//scale_vector(this->qdot_N, this->qdot);			// Scale qdot_R so that qdot is within limits
+			
 			
 //			yInfo("Here is the desired Cartesian velocity:");
 //			std::cout << this->xdot.toString() << std::endl;
@@ -305,6 +351,7 @@ void DualArmController::run()
 			this->torso.move_at_speed(yarp::sig::Vector({this->qdot[2],
 								     this->qdot[1],
 								     this->qdot[0]})); // IN REVERSE ORDER
+								     
 			this->leftArm.move_at_speed(this->qdot.subVector(3,9));
 			this->rightArm.move_at_speed(this->qdot.subVector(10,16));
 /*			
@@ -391,4 +438,35 @@ yarp::sig::Matrix DualArmController::get_pseudoinverse(const yarp::sig::Matrix &
 		
 		return invWJt*invA*U.transposed();					// Return the complete inversion
 	}
+}
+
+void DualArmController::update_speed_limits()
+{
+	for(int i = 0; i < 3; i++)
+	{
+		this->torso.get_speed_limits(2-i, this->vMin[i], this->vMax[i]);	// Torso joints are backwards
+	}
+	for(int i = 0; i < 7; i++)
+	{
+		this->leftArm.get_speed_limits(i, this->vMin[i+3], this->vMax[i+3]);
+		this->rightArm.get_speed_limits(i,this->vMin[i+10],this->vMax[i+10]);
+	}
+}
+
+void DualArmController::scale_vector(yarp::sig::Vector &input, const yarp::sig::Vector ref)
+{
+	double s = 1.0;
+	for(int i = 0; i < ref.size(); i++)
+	{
+		if(ref[i] > this->vMax[i] && this->vMax[i]/ref[i] > s)		// If ref is above limits AND largest observed so far...
+		{
+			s = this->vMax[i]/ref[i];				// ... update the scalar
+		}
+		else if(ref[i] < this->vMin[i] && this->vMin[i]/ref[i] > s)	// Else if ref is below limits and largest observed so far...
+		{
+			s = this->vMin[i]/ref[i];				// ... update the scalar
+		}
+	}
+	if(s != 1.0) yInfo() << "Scaling: " << s;
+	input *= s;								// Return the scaled vector
 }
