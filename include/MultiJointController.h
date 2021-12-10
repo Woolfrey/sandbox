@@ -31,14 +31,15 @@ class MultiJointController
 		
 		void get_speed_limits(const int &i, double &lower, double &upper); // Get the velocity constaint for a single joint
 		
+	protected:
+		int n;								// Number of joints
+		
+		std::string name;						// Identifies this object
+		
 	private:
 		double hertz = 100;						// Default control frequency
 		
-		int n;								// Number of joints
-		
 		Quintic trajectory;						// Joint-level trajectory generator
-		
-		std::string name;						// Identifies this object
 		
 		yarp::sig::Vector q, qdot;					// Joint position and velocity
 		yarp::sig::Vector qMin, qMax, range, vLim;			// Position and velocity limits
