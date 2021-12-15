@@ -16,6 +16,7 @@ class DualArmController : public yarp::os::PeriodicThread
 		DualArmController();					// Constructor
 		
 		void close();						// Close the device drivers
+		
 		void move_to_position(yarp::sig::Vector &left, yarp::sig::Vector &right, yarp::sig::Vector &mid);
 		void move_lateral(const double &distance);
 		void move_vertical(const double &distance);
@@ -45,6 +46,8 @@ class DualArmController : public yarp::os::PeriodicThread
 		void update_speed_limits();				// Get the min. and max. velocity for each joint
 		yarp::sig::Matrix get_inverse(const yarp::sig::Matrix &A); // Invert a matrix. Add damping as necessary
 		yarp::sig::Vector get_manip_grad(const std::string &which, const yarp::sig::Matrix &Jacobian);
+		yarp::sig::Vector get_force_grad(const std::string &which, const yarp::sig::Matrix &Jacobian, const yarp::sig::Vector &wrench);
+		double dot_product(const yarp::sig::Vector &a, const yarp::sig::Vector &b);
 		
 		// Control thread functions
 		bool threadInit();					// Executed after start() and before run()
@@ -90,7 +93,7 @@ DualArmController::DualArmController() : yarp::os::PeriodicThread(0.01)
 	this->I.resize(17,17);						// Identity matrix
 		this->I.eye();
 	this->N.resize(17,17);						// Null space projection matrix	
-	this->dJdq.resize(12,17);					// Partial derivative of the Jacobian			
+	this->dJdq.resize(6,10);					// Partial derivative of the Jacobian			
 
 	// Configure the device drivers for different parts of the robot
 	this->leftArm.configure("/local/left", "/icubSim/left_arm", "left");
@@ -294,18 +297,12 @@ void DualArmController::run()
 				
 			// Solve differential inverse kinematics
 			get_joint_weighting();						// NOTE: This is already the inverse!
-			
 			yarp::sig::Matrix invWJt = this->W*this->J.transposed();	// This makes calcs a little easier
-			yarp::sig::Matrix invJ = invWJt*get_inverse(this->J*invWJt); // Get the pseudoinverse
-			
+			yarp::sig::Matrix invJ = invWJt*get_inverse(this->J*invWJt);	// Get the pseudoinverse
 			this->qdot_R = invJ*this->xdot;					// Range space task
-			
-			update_speed_limits();						// Update for joint limit avoidance
-			
-			scale_vector(this->qdot_R, this->qdot_R);			// Scale range space vector to obey limits
+	
 			
 			this->nullSpaceTask = 1;
-
 			switch(this->nullSpaceTask)
 			{
 				case 0:							// Minimum velocity?
@@ -325,7 +322,25 @@ void DualArmController::run()
 					for(int i = 0; i < 3; i++) this->qdot_d[i]	+= 0.5*temp[i];
 					for(int i = 0; i < 7; i++) this->qdot_d[i+10]	= temp[i+3];
 					
-					this->qdot_d *= 2.0;				// Scale it
+					this->qdot_d *= 4.0;				// Scale it
+					
+					break;
+				}
+				case 2:							// Optimise stiffness
+				{
+					yarp::sig::Vector force({0,0,1,0,0,0});		// Specifies the direction we want to optimize
+					
+					// Get the gradient for the left arm
+					yarp::sig::Vector temp = get_force_grad("left", this->JL, force);
+					for(int i = 0; i < 3; i++) this->qdot_d[i] 	= 0.5*temp[i];
+					for(int i = 0; i < 7; i++) this->qdot_d[i+3]	= temp[i+3];
+					
+					// Get the gradient for the right arm
+					temp = get_force_grad("right", this->JR, force);
+					for(int i = 0; i < 3; i++) this->qdot_d[i]	+= 0.5*temp[i];
+					for(int i = 0; i < 7; i++) this->qdot_d[i+10]	= temp[i+3];
+					
+					this->qdot_d *= -2.0;				// Scale it
 					
 					break;
 				}
@@ -337,18 +352,19 @@ void DualArmController::run()
 				}
 			}	
 			
+			// Project the redundant task on the null space and add it
 			this->N = this->I - invJ*this->J;				// Null space projection matrix
 			this->qdot_N = this->N*this->qdot_d;				// Project the desired velocity on the null space
-			
 			this->qdot = this->qdot_R + this->qdot_N;			// Combine the range space and null space task
 			
+			// Scale the vectors so they remain within joint limits
+			update_speed_limits();						// Get new limits based on current state
+			scale_vector(this->qdot_R, this->qdot_R);			// Scale range space vector to obey limits
 			scale_vector(this->qdot_N, this->qdot);				// Scale null space task to obey joint limits
+			this->qdot = this->qdot_R + this->qdot_N;			// Recombine the range and null vectors after scaling
 
 			// Send the commands to the motors
-			this->torso.move_at_speed(yarp::sig::Vector({this->qdot[2],
-								     this->qdot[1],
-								     this->qdot[0]})); // IN REVERSE ORDER
-								     
+			this->torso.move_at_speed(yarp::sig::Vector({this->qdot[2], this->qdot[1], this->qdot[0]})); // IN REVERSE ORDER
 			this->leftArm.move_at_speed(this->qdot.subVector(3,9));
 			this->rightArm.move_at_speed(this->qdot.subVector(10,16));
 
@@ -392,7 +408,7 @@ void DualArmController::get_joint_weighting()
 	}
 }
 
-/******************** Get the weighted pseudoinverse Jacobian ********************/
+/******************** Get the inverse of a matrix ********************/
 yarp::sig::Matrix DualArmController::get_inverse(const yarp::sig::Matrix &A)
 {
 	yarp::sig::Matrix U(A.rows(), A.cols()), V(A.cols(), A.rows());			// Orthogonal matrices
@@ -407,7 +423,7 @@ yarp::sig::Matrix DualArmController::get_inverse(const yarp::sig::Matrix &A)
 		for(int j = 0; j < A.cols(); j++)
 		{
 			if(s(j) == 0);							// Ignore singular directions
-			else if(s(j) < 1e-03)	invA(i,j) += V(i,j)*1e03;
+			else if(s(j) < 1e-05)	invA(i,j) += V(i,j)*1e05;
 			else			invA(i,j) += V(i,j)/s(j);
 		}
 	}
@@ -415,6 +431,7 @@ yarp::sig::Matrix DualArmController::get_inverse(const yarp::sig::Matrix &A)
 	return invA*U.transposed();							// Complete the inversion and return	
 }
 
+/******************** Update the minimum and maximum permissable joint velocities ********************/
 void DualArmController::update_speed_limits()
 {
 	for(int i = 0; i < 3; i++)
@@ -428,6 +445,7 @@ void DualArmController::update_speed_limits()
 	}
 }
 
+/******************** Scale a task vector to remain within joint limits ********************/
 void DualArmController::scale_vector(yarp::sig::Vector &input, const yarp::sig::Vector ref)
 {
 	double s = 1.0;
@@ -437,7 +455,7 @@ void DualArmController::scale_vector(yarp::sig::Vector &input, const yarp::sig::
 		{
 			s = 0.99*this->vMax[i]/ref[i];					// ... update the scalar
 		}
-		else if(ref[i] < this->vMin[i] && this->vMin[i]/ref[i] < s)		// Else if ref is below limits and largest observed so far...
+		else if(ref[i] < this->vMin[i] && this->vMin[i]/ref[i] < s)		// Else if ref is below limits AND largest observed so far...
 		{
 			s = 0.99*this->vMin[i]/ref[i];					// ... update the scalar
 		}
@@ -445,6 +463,7 @@ void DualArmController::scale_vector(yarp::sig::Vector &input, const yarp::sig::
 	input *= s;									// Return the scaled vector
 }
 
+/******************** Compute the trace of a matrix ********************/
 double DualArmController::trace(const yarp::sig::Matrix &A)
 {
 	double t = 0;									// Value to be returned
@@ -453,6 +472,7 @@ double DualArmController::trace(const yarp::sig::Matrix &A)
 	return t;									// Return
 }
 
+/******************** Get the gradient of the measure of manipulability ********************/
 yarp::sig::Vector DualArmController::get_manip_grad(const std::string &which, const yarp::sig::Matrix &Jacobian)
 {
 	// Variables to be used
@@ -471,10 +491,57 @@ yarp::sig::Vector DualArmController::get_manip_grad(const std::string &which, co
 	{
 		if(which == "left")		this->dJdq = this->leftArm.get_partial_jacobian(i);
 		else if(which == "right")	this->dJdq = this->rightArm.get_partial_jacobian(i);
-		else yError("DualArmController::get_manip:grad() : Expected 'left' or 'right' as an argument.");
-		
-		grad[i] = mu*trace(dJdq*Jacobian.transposed()*invJJt);
+
+		grad[i] = mu*trace(this->dJdq*Jacobian.transposed()*invJJt);
 	}
 	
 	return grad;
 }
+
+/******************** Get the gradient for static joint torques ********************/
+yarp::sig::Vector DualArmController::get_force_grad(const std::string &which, const yarp::sig::Matrix &Jacobian, const yarp::sig::Vector &wrench)
+{
+	// Prepare the iKinChain object to compute the Hessian
+	if(which == "left")		this->leftArm.prep_for_hessian();
+	else if(which == "right")	this->rightArm.prep_for_hessian();
+	else				yError("DualArmController::get_force_grad() : Expected 'left' or 'right' as an argument.");
+
+	yarp::sig::Vector Jtw = Jacobian.transposed()*wrench;				// Makes calcs a little faster
+	
+//	yInfo("Here is J'*f:");
+//	std::cout << Jtw.toString() << std::endl;
+	
+	yarp::sig::Vector grad(10);							// Value to be returned
+	
+	for(int i = 0; i < 10; i++)
+	{
+		if(which == "left")		this->dJdq = this->leftArm.get_partial_jacobian(i);
+		else if(which == "right")	this->dJdq = this->leftArm.get_partial_jacobian(i);
+		
+//		yInfo("Here is (dJ/dq)'*f:");
+//		std::cout << (this->dJdq.transposed()*wrench).toString() << std::endl;
+		
+		grad[i] = dot_product(this->dJdq.transposed()*wrench, Jtw);
+	}
+	
+	return grad;
+}
+
+double DualArmController::dot_product(const yarp::sig::Vector &a, const yarp::sig::Vector &b)
+{
+	if(a.size() != b.size())
+	{
+		yError("DualArmController::dot_product() : Vectors are not of equal length!");
+		return 0;
+	}
+	else
+	{
+		double temp = 0.0;
+		for(int i = 0; i < a.size(); i++)
+		{
+			temp += a[i]*b[i];
+		}
+		return temp;
+	}
+}
+
