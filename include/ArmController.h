@@ -7,38 +7,29 @@
 class ArmController :	public MultiJointController
 {
 	public:
+	
 		ArmController() {};							// Empty constructor
 		
+		// Set Functions
 		void configure(const std::string &local_port_name,
 				const std::string &remote_port_name,
 				const std::string &_name);
-				
-		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();}
-		
-		void prep_for_hessian() {this->arm.prepareForHessian();}
-
-		yarp::sig::Matrix get_partial_jacobian(const int &j);			// Return dJ/dq
-		
-		yarp::sig::Matrix get_pose() {return this->arm.getH();}			// Get SE3 matrix for pose of the hand
-		
 		void set_joint_angles(const yarp::sig::Vector &angles) {this->arm.setAng(angles);}
-		
-		void set_cartesian_trajectory(const yarp::sig::Matrix &desired, const double &time);
-		
+		void set_cartesian_trajectory(const yarp::sig::Matrix &desired, const double &time);	
+							
+		// Get Functions		
+		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();}	// Returns the Jacobian matrix
+		void prep_for_hessian() {this->arm.prepareForHessian();} 		// Need to call this before getting dJ/dq
+		yarp::sig::Matrix get_partial_jacobian(const int &j);			// Return dJ/dq
+		yarp::sig::Matrix get_pose() {return this->arm.getH();}			// Get SE3 matrix for pose of the hand
 		yarp::sig::Vector get_cartesian_control(const double &time);
-		
-		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired,
-						const yarp::sig::Matrix &actual);
+		yarp::sig::Vector get_pose_error(const yarp::sig::Matrix &desired, const yarp::sig::Matrix &actual);
 	
 	private:
 		CartesianTrajectory trajectory;						// Obvious
-		
 		iCub::iKin::iCubArm arm;						// Arm kinematics
-		
-		yarp::sig::Matrix J, dJdq;
-		
+		yarp::sig::Matrix J, dJdq;						// Jacobian & partial derivative
 		yarp::sig::Matrix pos;							// Desired pose for the hand
-		
 		yarp::sig::Vector vel, acc;						// Desired velocity, acceleration for the hand
 		
 };											// Semicolon needed after class declaration
@@ -96,13 +87,12 @@ yarp::sig::Vector ArmController::get_pose_error(const yarp::sig::Matrix &desired
 		error[i]	= desired[i][3] - actual[i][3];				// Translation error
 		error[i+3]	= axisAngle[3]*axisAngle[i];				// Orientation error as angle*axis
 	}
-	
 	return error;
 }
 
 yarp::sig::Matrix ArmController::get_partial_jacobian(const int &j)
 {
-	yarp::sig::Matrix dJdq(6,this->n);
+	yarp::sig::Matrix dJdq(6,10);
 	
 	for(int i = 0; i < this->n; i++)
 	{
