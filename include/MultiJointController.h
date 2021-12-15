@@ -8,27 +8,22 @@ class MultiJointController
 {
 	public:
 		MultiJointController() {};					// Empty constructer
-		
 		void configure_drivers(const std::string &local_port_name,	// Configure communication with the robot
 					const std::string &remote_port_name,
 					const std::string &_name,
-					const int &number_of_joints);
-					
-		void close() { this->driver.close();}				// Close the drivers
-		
+					const int &number_of_joints);				
+		void close() { this->driver.close();}				// Close the driver
+		bool read_encoders();						// Read encoder values		
+		void joint_control(const double &time);				// Solve feedback control for given time
+		void move_at_speed(const yarp::sig::Vector speed);		// Send velocity commands to the motors
+						
+		// Set Functions
+		void set_joint_trajectory(yarp::sig::Vector &target);		// Set a new target for the joints
+				
+		// Get Functions
 		yarp::sig::Vector get_joint_positions() {return this->q;}	// As it says on the label
 		yarp::sig::Vector get_joint_velocities() {return this->qdot;}	// Anche
-		
-		bool read_encoders();						// Read encoder values
-		
-		void set_joint_trajectory(yarp::sig::Vector &target);		// Set a new target for the joints
-		
-		void joint_control(const double &time);				// Solve feedback control for given time
-		
-		void move_at_speed(const yarp::sig::Vector speed);		// Send velocity commands to the motors
-		
 		double get_joint_weight(const int &i);				// Penalty function for joint limit avoidance
-		
 		void get_speed_limits(const int &i, double &lower, double &upper); // Get the velocity constaint for a single joint
 		
 	protected:
@@ -141,23 +136,23 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 	}
 	else
 	{
-		yarp::sig::Vector temp(this->n);				// Temporary storage location
+		yarp::sig::Vector temp(this->n);						// Temporary storage location
 		
 		for(int i = 0; i < 5; i++)
 		{
-			if(this->encoder->getEncoders(temp.data()))		// Try and get initial values
+			if(this->encoder->getEncoders(temp.data()))				// Try and get initial values
 			{
-				break;						// This should break the loop
+				break;								// This should break the loop
 			}
 			if(i == 5)
 			{
 				yError() << "Could not obtain encoder values for" << this->name << "in 5 attempts.";
 				totalSuccess = false;
 			}
-			yarp::os::Time::delay(0.05);				// wait a little bit and try again
+			yarp::os::Time::delay(0.05);						// wait a little bit and try again
 		}
 		
-		this->q = temp*M_PI/180;					// Make sure the values are in radians
+		this->q = temp*M_PI/180;							// Make sure the values are in radians
 	}
 	if(totalSuccess) yInfo() << "Successfully configured drivers for the" << this->name + ".";
 }
