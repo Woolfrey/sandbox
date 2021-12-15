@@ -4,36 +4,40 @@
 #include <yarp/os/LogStream.h>							// yarp::Info() and the like
 #include <yarp/os/Property.h>							// Don't know exactly what this does
 
-class MultiJointController
+class JointCtrl
 {
 	public:
-		MultiJointController() {};					// Empty constructer
-		void configure_drivers(const std::string &local_port_name,	// Configure communication with the robot
-					const std::string &remote_port_name,
-					const std::string &_name,
-					const int &number_of_joints);				
+		// Constructor
+		JointCtrl() {};
+		
+		// General Functions
+		bool configure_drivers(const std::string &local_port_name,	// Configure drivers for robot hardware
+				const std::string &remote_port_name,
+				const std::string &_name,
+				const int &number_of_joints);			
 		void close() { this->driver.close();}				// Close the driver
-		bool read_encoders();						// Read encoder values		
-		void joint_control(const double &time);				// Solve feedback control for given time
-		void move_at_speed(const yarp::sig::Vector speed);		// Send velocity commands to the motors
-						
+		bool move_at_speed(const yarp::sig::Vector &speed);		// Set velocity command on motor drivers
+		void track_joint_trajectory(const double &time);		// Track the internal trajectory object
+		
 		// Set Functions
-		void set_joint_trajectory(yarp::sig::Vector &target);		// Set a new target for the joints
-				
+		bool set_frequency(const double &freq);
+		bool set_joint_trajectory(yarp::sig::Vector &target);		// Set a new joint trajectory object
+			
 		// Get Functions
-		yarp::sig::Vector get_joint_positions() {return this->q;}	// As it says on the label
-		yarp::sig::Vector get_joint_velocities() {return this->qdot;}	// Anche
-		double get_joint_weight(const int &i);				// Penalty function for joint limit avoidance
-		void get_speed_limits(const int &i, double &lower, double &upper); // Get the velocity constaint for a single joint
+		bool read_encoders();						// Read position, velocity of the joints
+		bool get_speed_limits(const int &i, double &lower, double &upper); // Get the velocity constraints for a single joint
+		double get_joint_weight(const int &i);				// Used in joint limit avoidance
+		yarp::sig::Vector get_joint_positions() {return this->q;}	// As it says
+		yarp::sig::Vector get_joint_velocities() {return this->qdot;}	// As it says
 		
 	protected:
+		double hertz = 100;						// Control frequency
 		int n;								// Number of joints
-		
 		std::string name;						// Identifies this object
 		
 	private:
-		double hertz = 100;						// Default control frequency
-		
+		double upper, lower, penalty, dpdq;				// Used in joint limit avoidance
+				
 		Quintic trajectory;						// Joint-level trajectory generator
 		
 		yarp::sig::Vector q, qdot;					// Joint position and velocity
@@ -49,8 +53,24 @@ class MultiJointController
 		
 };										// Semicolon needed after a class declaration
 
+/******************** Set the control frequency (usedf or internal calcs) ********************/
+bool JointCtrl::set_frequency(const double &freq)
+{
+	if(freq > 0)
+	{
+		this->hertz = freq;
+		return true;
+	}
+	else
+	{
+		yError("JointCtrl::set_control_frequency() : Frequency cannot be negative!");
+		this->hertz = 100;
+		return false;
+	}
+}
+
 /******************** As it says on the label ********************/
-void MultiJointController::configure_drivers(const std::string &local_port_name,
+bool JointCtrl::configure_drivers(const std::string &local_port_name,
 						const std::string &remote_port_name,
 						const std::string &_name,
 						const int &number_of_joints)
@@ -155,10 +175,68 @@ void MultiJointController::configure_drivers(const std::string &local_port_name,
 		this->q = temp*M_PI/180;							// Make sure the values are in radians
 	}
 	if(totalSuccess) yInfo() << "Successfully configured drivers for the" << this->name + ".";
+	
+	return totalSuccess;
+}
+
+/******************** Set a new joint trajectory ********************/
+bool JointCtrl::set_joint_trajectory(yarp::sig::Vector &target)
+{
+	// Check the inputs are sound
+	if(target.size() > this->n)
+	{
+		yError() << "JointCtrl::set_joint_trajectory() : Length of input vector is greater than the number of joints!";
+		return false;
+	}
+	else
+	{
+		// Ensure the target is within joint limits
+		for(int i = 0; i < this->n; i++)
+		{
+			if(target[i] > this->qMax[i])	target[i] = this->qMax[i] - 0.01;
+			if(target[i] < this->qMin[i])	target[i] = this->qMin[i] + 0.01;
+		}
+		
+		// Compute optimal time scaling
+		double dt, dq;
+		double endTime = 2.0;
+		
+		for(int i = 0; i < this->n; i++)
+		{
+			dq = abs(target[i] - this->q[i]);				// Distance to target
+			if(dq > 0)	dt = (15*dq)/(8*this->vLim[i]);			// Optimal time scaling at peak velocity
+			if(dt > endTime) endTime = dt;
+		}
+		
+		this->trajectory = Quintic(this->q, target, 0.0, endTime);
+		return true;
+	}
+}
+
+/******************** Send velocity commands to each individual joint ********************/
+bool JointCtrl::move_at_speed(const yarp::sig::Vector &speed)
+{
+	if(speed.size() != this->n)
+	{
+		yError("JointCtrl::move_at_speed() : Length of input vector does not match the number of joints!");
+		return false;
+	}
+	else
+	{
+		for(int i = 0; i < this->n; i++) this->controller->velocityMove(i,speed[i]*180/M_PI); // Convert from rad/s to deg/s
+		return true;
+	}
+}
+
+/******************** Return feedback control to track trajectory object ********************/
+void JointCtrl::track_joint_trajectory(const double &time)
+{
+	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
+	move_at_speed(this->vel + 5.0*(this->pos - this->q));				// Send commands to the motors
 }
 
 /******************** Get new joint encoder information ********************/
-bool MultiJointController::read_encoders()
+bool JointCtrl::read_encoders()
 {
 	bool success = true;
 	
@@ -183,89 +261,11 @@ bool MultiJointController::read_encoders()
 	return success;
 }
 
-/******************** Set a new joint trajectory ********************/
-void MultiJointController::set_joint_trajectory(yarp::sig::Vector &target)
-{
-	// Check the inputs are sound
-	if(target.size() > this->n)
-	{
-		yError() << "MultiJointController::set_joint_trajectory() : Length of input vector is greater than the number of joints!";
-	}
-	else
-	{
-		// Ensure the target is within joint limits
-		for(int i = 0; i < this->n; i++)
-		{
-			if(target[i] > this->qMax[i])	target[i] = this->qMax[i] - 0.01;
-			if(target[i] < this->qMin[i])	target[i] = this->qMin[i] + 0.01;
-		}
-		
-		// Compute optimal time scaling
-		double dt, dq;
-		double endTime = 2.0;
-		
-		for(int i = 0; i < this->n; i++)
-		{
-			dq = abs(target[i] - this->q[i]);				// Distance to target
-			if(dq > 0)	dt = (15*dq)/(8*this->vLim[i]);			// Optimal time scaling at peak velocity
-			if(dt > endTime) endTime = dt;
-		}
-		
-		this->trajectory = Quintic(this->q, target, 0.0, endTime);
-	}
-}
-
-/******************** Solve the trajectory tracking control ********************/
-void MultiJointController::joint_control(const double &time)
-{
-	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
-
-	move_at_speed(this->vel + 5.0*(this->pos - this->q));				// Send commands to the motors
-}
-
-/******************** Send velocity commands to each individual joint ********************/
-void MultiJointController::move_at_speed(const yarp::sig::Vector speed)
-{
-	if(speed.size() != this->n)
-	{
-		yError("MultiJointController::move_at_speed() : Length of input vector does not match the number of joints!");
-	}
-	else
-	{
-		// CHECK THE SPEED LIMITS HERE?
-		for(int i = 0; i < this->n; i++) this->controller->velocityMove(i,speed[i]*180/M_PI);
-	}
-}
-
-/******************** Get the penalty term for avoiding joint limits ********************/
-double MultiJointController::get_joint_weight(const int &i)
-{
-	double upper = this->qMax[i] - this->q[i];					// Distance to upper limit
-	double lower = this->q[i] - this->qMin[i];					// Distance to lower limit
-	
-//	double dpdq = pow(upper,-2) - pow(lower,-2);					// Partial derivative of penalty function
-	double dpdq = (pow(this->range[i],2)*(2*this->q[i] - this->qMax[i] - this->qMin[i]))/
-			(4*pow(upper,2)*pow(lower,2));
-	
-	if(dpdq*this->qdot[i] > 0)							// Moving toward a joint limit
-	{
-//		double penalty = this->range[i]/(upper*lower)-4/this->range[i]+1;	// Penalize joint motion toward limits
-		double penalty = pow(this->range[i],2)/(4*upper*lower);
-		if(penalty < 0)
-		{
-			yError() << "Penalty term for joint " << i + 1 << " of the " << this->name << ": " << penalty
-			<< " Joint position: " << this->qMin[i] << " " << this->q[i] << " " << this->qMax[i];
-			return 0;							// Something went wrong and the joint is outside its limits?
-		}
-		else	return 1/penalty;						// Returns the INVERSE when moving toward a limit
-	}
-	else		return 1.0;							// Free movement away from the limits
-}
-
-void MultiJointController::get_speed_limits(const int &i, double &lower, double &upper)
+/******************** Get the min, max speed for each joint to avoid limits ********************/
+bool JointCtrl::get_speed_limits(const int &i, double &lower, double &upper)
 {
 	double temp = this->hertz*(this->qMax[i] - this->q[i]);				// Maximum speed to reach upper joint limit
-	
+
 	if(this->vLim[i] > temp)	upper = temp;
 	else				upper = this->vLim[i];
 	
@@ -273,4 +273,29 @@ void MultiJointController::get_speed_limits(const int &i, double &lower, double 
 	
 	if(-1*this->vLim[i] < temp)	lower = temp;
 	else				lower = -1*this->vLim[i];
+	
+	return true; // Not sure what to do with this
 }
+
+/******************** Get the penalty term for avoiding joint limits ********************/
+double JointCtrl::get_joint_weight(const int &i)
+{
+	this->upper = this->qMax[i] - this->q[i];					// Distance to upper limit
+	this->lower = this->q[i] - this->qMin[i];					// Distance to lower limit
+	this->dpdq = (pow(this->range[i],2)*(2*this->q[i] - this->qMax[i] - this->qMin[i]))/
+			(4*pow(this->upper,2)*pow(this->lower,2));
+	
+	if(dpdq*this->qdot[i] > 0)							// Moving toward a joint limit
+	{
+		this->penalty = pow(this->range[i],2)/(4*this->upper*this->lower);
+		if(this->penalty < 0)
+		{
+			yError() << "Penalty term for joint " << i + 1 << " of the " << this->name << ": " << this->penalty
+			<< " Joint position: " << this->qMin[i] << " " << this->q[i] << " " << this->qMax[i];
+			return 0;							// Something went wrong and the joint is outside its limits?
+		}
+		else	return 1/this->penalty;						// Returns the INVERSE when moving toward a limit
+	}
+	else		return 1.0;							// Free movement away from the limits
+}
+
