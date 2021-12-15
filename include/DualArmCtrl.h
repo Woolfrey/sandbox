@@ -12,6 +12,9 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		bool update_state();					// Update the position and velocity of the joints
 		void close();						// Close the device drivers
 		void print_pose(const std::string &which);		// Print the pose of the specified hand
+	
+		// Get Functions
+		yarp::sig::Matrix get_hand_pose(const std::string &which);
 		
 		// Cartesian Control Functions
 		void move_to_position(yarp::sig::Vector &left,		// Move the joints to a desired position
@@ -20,23 +23,18 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 				
 		void move_to_pose(const yarp::sig::Matrix &left,
 				const yarp::sig::Matrix &right);
-				
-/*
-		void move_to_position(yarp::sig::Vector &left, yarp::sig::Vector &right, yarp::sig::Vector &mid);
-		void move_lateral(const double &distance);
-		void move_vertical(const double &distance);
-		void move_in_out(const double &distance);
-		void move_horizontal(const double &distance);
-*/
-			
+		
+		void set_redundant_task(const unsigned int &num, const double &scalar);
+		
 	private:
 		// Variables
 		bool leftControl = false;
 		bool rightControl = false;
 		double elapsedTime, startTime;				// Used to regulate the control loop
+		double alpha;						// Gain on the redundant task for GPM
 		int controlSpace = 100;					// 1 = Joint, 2 = Cartesian
 		int nullSpaceTask = 0;					// 0 = Nothing, 1 = Manipulability, 2 = Stiffness
-		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, qdot_d, vMin, vMax;
+		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, qdot_d, vMin, vMax, gradL, gradR;
 		yarp::sig::Matrix J, JL, JR, W, I, N, dJdq;
 						
 		// Objects
@@ -78,6 +76,7 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(freq)
 	this->qdot_d.resize(17);
 	this->vMin.resize(17);						// Minimum speed for the joints
 	this->vMax.resize(17);						// Maximum speed for the joints
+	this->gradL(10); this->gradR(10);				// Gradient vectors
 		
 	// Resize matrices
 	this->J.resize(12,17);						// Jacobian for both arms
@@ -97,6 +96,8 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(freq)
 	this->leftArm.set_frequency(freq);
 	this->rightArm.set_frequency(freq);
 	this->torso.set_frequency(freq);
+	
+//	update_state();
 }
 
 /******************** Get and set new joint state information ********************/
@@ -148,6 +149,19 @@ void DualArmCtrl::print_pose(const std::string &which)
 		std::cout << this->rightArm.get_pose().toString() << std::endl;
 	}
 }
+
+/******************** Get the pose of the hand ********************/
+yarp::sig::Matrix DualArmCtrl::get_hand_pose(const std::string &which)
+{
+	if(which == "left")		return this->leftArm.get_pose();
+	else if(which == "right")	return this->rightArm.get_pose();
+	else
+	{
+		yError("DualArmCtrl::get_hand_pose() : Expected 'left' or 'right' as an argument!");
+		yarp::sig::Matrix temp(4,4);
+		return temp.eye();
+	}
+}	
 
 /******************** Move the joints to desired configuration ********************/
 void DualArmCtrl::move_to_position(yarp::sig::Vector &left, yarp::sig::Vector &right, yarp::sig::Vector &mid)
@@ -207,6 +221,13 @@ void DualArmCtrl::move_to_pose(const yarp::sig::Matrix &left, const yarp::sig::M
 	}
 }
 
+/******************** Set the null space task ********************/
+void DualArmCtrl::set_redundant_task(const unsigned int &num, const double &scalar)
+{
+	this->nullSpaceTask = num;
+	this->alpha = scalar;
+}
+
 /******************** Executed after start() and before run() ********************/
 bool DualArmCtrl::threadInit()
 {
@@ -264,57 +285,37 @@ void DualArmCtrl::run()
 			yarp::sig::Matrix invWJt = this->W*this->J.transposed();	// This makes calcs a little easier
 			yarp::sig::Matrix invJ = invWJt*get_inverse(this->J*invWJt);	// Get the pseudoinverse
 			this->qdot_R = invJ*this->xdot;					// Range space task
-	
 			
-			this->nullSpaceTask = 1;
 			switch(this->nullSpaceTask)
 			{
-				case 0:							// Minimum velocity?
+				case 1:
 				{
-					this->qdot_d.zero();
+					this->gradL = get_manip_grad("left", this->JL);
+					this->gradR = get_manip_grad("right", this->JR);
 					break;
 				}
-				case 1:							// Optimise manipulability
+				case 2:
 				{
-					// Get the gradient for the left arm
-					yarp::sig::Vector temp = get_manip_grad("left", this->JL);
-					for(int i = 0; i < 3; i++) this->qdot_d[i]	= 0.5*temp[i];
-					for(int i = 0; i < 7; i++) this->qdot_d[i+3]	= temp[i+3];
-					
-					// Get the gradient for the right arm
-					temp = get_manip_grad("right", this->JR);
-					for(int i = 0; i < 3; i++) this->qdot_d[i]	+= 0.5*temp[i];
-					for(int i = 0; i < 7; i++) this->qdot_d[i+10]	= temp[i+3];
-					
-					this->qdot_d *= 4.0;				// Scale it
-					
-					break;
-				}
-				case 2:							// Optimise stiffness
-				{
-					yarp::sig::Vector force({0,0,1,0,0,0});		// Specifies the direction we want to optimize
-					
-					// Get the gradient for the left arm
-					yarp::sig::Vector temp = get_force_grad("left", this->JL, force);
-					for(int i = 0; i < 3; i++) this->qdot_d[i] 	= 0.5*temp[i];
-					for(int i = 0; i < 7; i++) this->qdot_d[i+3]	= temp[i+3];
-					
-					// Get the gradient for the right arm
-					temp = get_force_grad("right", this->JR, force);
-					for(int i = 0; i < 3; i++) this->qdot_d[i]	+= 0.5*temp[i];
-					for(int i = 0; i < 7; i++) this->qdot_d[i+10]	= temp[i+3];
-					
-					this->qdot_d *= -2.0;				// Scale it
-					
+					yarp::sig::Vector force({0, 0, 1, 0, 0, 0});
+					this->gradL = get_force_grad("left", this->JL, force);
+					this->gradR = get_force_grad("right", this->JR, force);
 					break;
 				}
 				default:
 				{
-					yInfo("Worker bees can leave.");
-					yInfo("Even drones can fly away.");
-					yInfo("The Queen is their slave.");
+					this->gradL.zero();
+					this->gradR.zero();
+					break;
 				}
-			}	
+			}
+			
+			for(int i = 0; i < 7; i++)
+			{
+				if(i < 3) this->qdot[i] = (this->gradL[i] + this->gradR[i])/2;
+				this->qdot_d[i+3]  = this->gradL[i+3];
+				this->qdot_d[i+10] = this->gradR[i+3];
+			}
+			this->qdot_d *= this->alpha;					// Scale the gradient
 			
 			// Project the redundant task on the null space and add it
 			this->N = this->I - invJ*this->J;				// Null space projection matrix
@@ -346,6 +347,7 @@ void DualArmCtrl::run()
 	// Run this function repeatedly until stop() is called, then go to threadRelease();
 }
 
+/******************** Executed after stop() is called ********************/
 void DualArmCtrl::threadRelease()
 {
 	// Ensure the last command is zero velocity
