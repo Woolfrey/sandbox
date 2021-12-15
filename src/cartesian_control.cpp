@@ -4,12 +4,15 @@
 #include <yarp/os/RpcServer.h>
 
 // Pre-defined positions
-double d2r = M_PI/180;
 yarp::sig::Vector home_torso({0.0, 0.0, 0.0});			
-yarp::sig::Vector home_arm({-30*d2r, 30*d2r,  00*d2r, 45*d2r,  00*d2r,  00*d2r, 0});
-yarp::sig::Vector receive( {-50*d2r, 10*d2r,  00*d2r, 40*d2r, -60*d2r,  20*d2r, 10*d2r});
-yarp::sig::Vector shake(   {-50*d2r, 40*d2r,  65*d2r, 45*d2r, -70*d2r, -20*d2r, 0*d2r});
-yarp::sig::Vector wave(    {-30*M_PI/180, 50*M_PI/180, -30*M_PI/180, 105*M_PI/180, 30*M_PI/180, 0, 0});
+yarp::sig::Vector home_arm({-30, 30,  00,  45,  00,  00,  0});
+yarp::sig::Vector receive( {-50, 10,  00,  40, -60,  20, 10});
+yarp::sig::Vector shake(   {-50, 40,  65,  45, -70, -20,  0});
+yarp::sig::Vector wave(    {-30, 50, -30, 105,  30,   0,  0});		
+
+
+// Forward declaration - for readability
+std::string process_command(const std::string &input, DualArmCtrl &robot);
 
 /********************* This is where the action happens *********************/
 int main(int argc, char *argv[])
@@ -28,10 +31,108 @@ int main(int argc, char *argv[])
 	// Run the control loop
 	bool controlActive = true;
 	
+	while(controlActive)
+	{
+		output.clear();
+		port.read(input, true);
+		command = input.toString();
+		
+		if(command == "close") 						// Shut down the robot
+		{
+			output.addString("Arrivederci");
+			controlActive = false;
+		}
+		else
+		{
+			output.addString(process_command(command, controller)); // This is just to make the code a bit more readable
+		}
+		
+		port.reply(output);						// Respond to the user
+	}
 	
 	controller.close();							// Close the device drivers
 	
 	return 0;								// No problems with main()
+}
+
+std::string process_command(const std::string &input, DualArmCtrl &robot)
+{
+	int space;
+	std::string response;
+	yarp::sig::Vector torso(3), leftArm(7), rightArm(7);
+	yarp::sig::Matrix leftHand(4,4), rightHand(4,4);
+
+	// Joint Control Options
+	
+	
+	// Cartesian Control Options
+	if(input == "up")
+	{
+		space = 2;
+		response = "Su";
+	}
+	else if(input == "down")
+	{
+		space = 2;
+		response = "Giu`";
+	}
+	else if(input == "left")
+	{
+		space = 2;
+		response = "Sinistra";
+	}
+	else if(input == "right")
+	{
+		space = 2;
+		response = "Destra";
+	}
+	else if(input == "straighten")
+	{
+		space = 2;
+		response = "Ricevuto";
+	}
+	else if(input == "manipulability")
+	{
+		space = 2;
+		response = "Ricevuto";
+		robot.set_redundant_task(1, 5.0);
+		leftHand = robot.get_hand_pose("left");
+		rightHand = robot.get_hand_pose("right");
+	}
+	else if(input == "stiffness")
+	{
+		space = 2;
+		response = "Ricevuto";
+		robot.set_redundant_task(2,-3.0);
+		leftHand = robot.get_hand_pose("left");
+		rightHand = robot.get_hand_pose("right");
+	}
+	
+	// Default option
+	else
+	{
+		space = 0;
+		response = "Che cosa?";
+	}
+	
+	switch(space)
+	{
+		case 1:
+		{
+			break;
+		}
+		case 2:
+		{
+			robot.move_to_pose(leftHand, rightHand);
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
+	
+	return response;
 }
 
 /*	
