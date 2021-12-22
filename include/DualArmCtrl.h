@@ -31,7 +31,7 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		bool leftControl = false;
 		bool rightControl = false;
 		double elapsedTime, startTime;				// Used to regulate the control loop
-		double alpha;						// Gain on the redundant task for GPM
+		double alpha = 1;					// Gain on the redundant task for GPM
 		int controlSpace = 100;					// 1 = Joint, 2 = Cartesian
 		int nullSpaceTask = 0;					// 0 = Nothing, 1 = Manipulability, 2 = Stiffness
 		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, qdot_d, vMin, vMax, gradL, gradR;
@@ -65,7 +65,7 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 };									// Semicolon needed after class declaration
 
 /******************** Constructor ********************/
-DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(freq)
+DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(1/freq)
 {
 	// Resize vectors
 	this->xdot.resize(12);						// Task velocity vector
@@ -76,7 +76,8 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(freq)
 	this->qdot_d.resize(17);
 	this->vMin.resize(17);						// Minimum speed for the joints
 	this->vMax.resize(17);						// Maximum speed for the joints
-	this->gradL(10); this->gradR(10);				// Gradient vectors
+	this->gradL.resize(10);
+	this->gradR.resize(10);						// Gradient vectors
 		
 	// Resize matrices
 	this->J.resize(12,17);						// Jacobian for both arms
@@ -97,7 +98,16 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(freq)
 	this->rightArm.set_frequency(freq);
 	this->torso.set_frequency(freq);
 	
-//	update_state();
+	// Set a new base reference
+	yarp::sig::Matrix T = this->leftArm.get_base_pose();
+	T[2][3] = 0.65;
+	this->leftArm.set_base_pose(T);
+
+	T = this->rightArm.get_base_pose();
+	T[2][3] = 0.65;
+	this->rightArm.set_base_pose(T);
+
+	update_state();
 }
 
 /******************** Get and set new joint state information ********************/
@@ -343,7 +353,6 @@ void DualArmCtrl::run()
 			break;
 		}
 	}	
-	
 	// Run this function repeatedly until stop() is called, then go to threadRelease();
 }
 
@@ -502,9 +511,6 @@ yarp::sig::Vector DualArmCtrl::get_force_grad(const std::string &which, const ya
 	}
 	return grad;
 }
-
-
-
 
 /******************** Cartesian Control Functions ********************
 void DualArmCtrl::move_lateral(const double &distance)

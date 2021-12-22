@@ -232,7 +232,7 @@ bool JointCtrl::move_at_speed(const yarp::sig::Vector &speed)
 void JointCtrl::track_joint_trajectory(const double &time)
 {
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
-	move_at_speed(this->vel + 5.0*(this->pos - this->q));				// Send commands to the motors
+	move_at_speed(this->vel + 1.0*(this->pos - this->q));				// Send commands to the motors
 }
 
 /******************** Get new joint encoder information ********************/

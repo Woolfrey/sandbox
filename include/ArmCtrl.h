@@ -20,8 +20,10 @@ class ArmCtrl :	public JointCtrl
 		// Set Functions
 		bool set_cartesian_trajectory(const yarp::sig::Matrix &desired, const double &time);
 		bool set_joint_angles(const yarp::sig::Vector &angles);
+		void set_base_pose(const yarp::sig::Matrix &basePose) {this->arm.setH0(basePose);}
 		
 		// Get Functions
+		yarp::sig::Matrix get_base_pose() {return this->arm.getH0();}
 		yarp::sig::Matrix get_jacobian() {return this->arm.GeoJacobian();}	// As it says on the label
 		yarp::sig::Matrix get_partial_jacobian(const int &j);			// Returns partial derivative of Jacobian w.r.t joint j
 		yarp::sig::Matrix get_pose() {return this->T;}				// Get the SE(3) matrix for the pose of the hand
@@ -93,19 +95,35 @@ yarp::sig::Matrix ArmCtrl::get_partial_jacobian(const int &j)
 yarp::sig::Vector ArmCtrl::get_cartesian_control(const double &time)
 {
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state for the current time	
-	return vel + 5.0*(get_pose_error(pos, this->T));				// Feedforward + feedback
+	
+	return get_pose_error(pos, this->T);					// Feedforward + feedback
 }
 
 /******************** Get the pose error to perform feedback control ********************/
 yarp::sig::Vector ArmCtrl::get_pose_error(const yarp::sig::Matrix &desired, const yarp::sig::Matrix &actual)
 {
-	yarp::sig::Matrix Re = desired.submatrix(0,2,0,2)*actual.submatrix(0,2,0,2).transposed(); // Rotation error as SO(3)
-	yarp::sig::Vector axisAngle = yarp::math::dcm2axis(Re);				// Convert SO(3) to axis-angle
-	yarp::sig::Vector error(6);							// Vector to be returned
+	yarp::math::Quaternion qd, qa;
+	qd.fromRotationMatrix(desired.submatrix(0,2,0,2));
+	qa.fromRotationMatrix(desired.submatrix(0,2,0,2));
+	yarp::sig::Vector qe  = (qd*qa.inverse()).toVector();
+	
+	double angle = 2*acos(qe[0]);
+	if(angle > M_PI)								// If the angle is greater than 180 degrees...
+	{
+		angle  = 2*M_PI - angle;						// ... take the shorter path...
+		qe[0] = cos(0.5*angle);							// ... and flip the axis to match
+		//for(int i = 0; i < 3; i++) qe[i+1] *= -1;
+	}
+	
+	yarp::sig::Vector error(6);
 	for(int i = 0; i < 3; i++)
 	{
-		error[i]	= desired[i][3] - actual[i][3];				// Translation error
-		error[i+3]	= axisAngle[3]*axisAngle[i];				// Orientation error as angle*axis
+		error[i] = desired[i][3] - actual[i][3];				// Difference in position
+		error[i+3] = 0;qe[i+3];							// Use the vector part of the quaternion error
 	}
+	
+	//yInfo("Here is the orientation error:");
+	//std::cout << 2*asin(error[3])*180/M_PI << " " << 2*asin(error[4])*180/M_PI << " " << 2*asin(error[5])*180/M_PI << std::endl;
+
 	return error;
 }
