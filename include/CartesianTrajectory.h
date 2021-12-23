@@ -26,11 +26,11 @@ class CartesianTrajectory
 		
 		// State information
 		yarp::sig::Vector pos;							// Position / translation (m)
-		yarp::sig::Matrix rot;							// Rotation (SO3)
+		yarp::sig::Matrix rot;							// Rotation matrix
 		yarp::sig::Vector linearVel;						// Linear velocity (m/s)
 		yarp::sig::Vector linearAcc;						// Linear acceleration (m/s/s)
 		yarp::sig::Vector angularVel;						// Angular velocity (rad/s)
-		yarp::sig::Vector angularAcc;						// Angular acceleration (rad/s/s
+		yarp::sig::Vector angularAcc;						// Angular acceleration (rad/s/s)
 			
 };											// Semicolon needed after class declaration
 
@@ -63,16 +63,12 @@ CartesianTrajectory::CartesianTrajectory(const yarp::sig::Matrix &startPose,		//
 	// Create the position trajectory
 	yarp::sig::Vector startPoint({startPose[0][3], startPose[1][3], startPose[2][3]});
 	yarp::sig::Vector endPoint({endPose[0][3], endPose[1][3], endPose[2][3]});
-	this->quinticPosition = Quintic(startPoint,
-					endPoint,
-					startTime,
-					endTime);
+	this->quinticPosition = Quintic(startPoint, endPoint, startTime, endTime);
 	
 	// Create the orientation trajectory
 	this->quinticOrientation = Quintic(startPose.submatrix(0,2,0,2),
 					endPose.submatrix(0,2,0,2),
-					startTime,
-					endTime);
+					startTime, endTime);
 }
 
 /******************** Get the desired state for the given time ********************/
@@ -97,15 +93,19 @@ void CartesianTrajectory::get_state(yarp::sig::Matrix &pose,					// Get the desi
 	this->quinticOrientation.get_state(this->rot, this->angularVel, this->angularAcc, time);
 	
 	// Combine the information
-	pose.setSubmatrix(this->rot, 0,0);						// Assign the rotation part
 	for(int i = 0; i < 3; i++)
 	{
 		pose[i][3] 	= this->pos[i];						// Assign the translation part
-		vel[i]		= this->linearVel[i];
+		vel[i]		= this->linearVel[i];					
 		vel[i+3]	= this->angularVel[i];
 		acc[i]		= this->linearAcc[i];
 		acc[i+3]	= this->angularAcc[i];
 		pose[3][i]	= 0.0;							// Ensure pose is an SE3 matrix
+		
+		for(int j = 0; j < 3; j++)
+		{
+			pose[i][j] = this->rot[i][j];					// Assign the rotation matrix
+		}
 	}
 		pose[3][3]	= 1.0;
 }
