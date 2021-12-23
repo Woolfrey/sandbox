@@ -48,6 +48,21 @@ int main(int argc, char *argv[])
 			output.addString("Fermata");
 			controller.stop();
 		}
+		else if(command == "left hand")
+		{
+			output.addString("Check the other terminal!");
+			controller.print_pose("left");
+		}
+		else if(command == "right hand")
+		{
+			output.addString("Check the other terminal!");
+			controller.print_pose("right");
+		}
+		else if(command == "base")
+		{
+			output.addString("Check the other terminal!");
+			controller.print_pose("base");
+		}
 		else
 		{
 			output.addString(process_command(command, controller)); // This is just to make the code a bit more readable
@@ -67,6 +82,8 @@ std::string process_command(const std::string &input, DualArmCtrl &robot)
 	std::string response;
 	yarp::sig::Vector torso(3), leftArm(7), rightArm(7);
 	yarp::sig::Matrix leftHand(4,4), rightHand(4,4);
+	yarp::sig::Matrix DL = yarp::math::rpy2dcm(yarp::sig::Vector({-1.15*M_PI/2,-0.0,0})); // Keeps the palms vertical
+	yarp::sig::Matrix DR = yarp::math::rpy2dcm(yarp::sig::Vector({-0.85*M_PI/2, 0.0,0}));
 
 	// Joint Control Options
 	if(input == "home")
@@ -83,34 +100,133 @@ std::string process_command(const std::string &input, DualArmCtrl &robot)
 	{
 		space = 2;
 		response = "Su";
+
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[2][3] += 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[2][3] += 0.1;
+		rightHand = DR;
+		
 	}
 	else if(input == "down")
 	{
 		space = 2;
 		response = "Giu`";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[2][3] -= 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[2][3] -= 0.1;
+		rightHand = DR;
 	}
 	else if(input == "left")
 	{
 		space = 2;
 		response = "Sinistra";
+
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[1][3] += 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[1][3] += 0.1;
+		rightHand = DR;
 	}
 	else if(input == "right")
 	{
 		space = 2;
 		response = "Destra";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[1][3] -= 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[1][3] -= 0.1;
+		rightHand = DR;
+	}
+	else if(input == "in")
+	{
+		space = 2;
+		response = "Piu` vicino";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[1][3] -= 0.05;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[1][3] += 0.05;
+		rightHand = DR;	
+	}
+	else if(input == "out")
+	{
+		space = 2;
+		response = "Piu` lontano";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[1][3] += 0.05;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[1][3] -= 0.05;
+		rightHand = DR;
+	}	
+	else if(input == "forward")
+	{
+		space = 2;
+		response = "Avanti";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[0][3] += 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[0][3] += 0.1;
+		rightHand = DR;
+	}
+	else if(input == "back")
+	{
+		space = 2;
+		response = "Arretrato";
+		
+		yarp::sig::Matrix temp = robot.get_hand_pose("left");
+		for(int i = 0; i < 3; i++) DL[i][3] = temp[i][3];		// Assign the translation
+		DL[0][3] -= 0.1;
+		leftHand = DL;
+		
+		temp = robot.get_hand_pose("right");
+		for(int i = 0; i < 3; i++) DR[i][3] = temp[i][3];		// Assign the translation
+		DR[0][3] -= 0.1;
+		rightHand = DR;
 	}
 	else if(input == "straighten")
 	{
 		space = 2;
 		response = "Ricevuto";
-		yarp::sig::Matrix R;						// We want the hands to go to this orientation
-		R = yarp::math::rpy2dcm(yarp::sig::Vector({M_PI/8, 0, 0})); 	// Rotate the z-axis to face left
 		
 		leftHand = robot.get_hand_pose("left");
-		leftHand.setSubmatrix(R.submatrix(0,2,0,2),0,0);	
+		leftHand.setSubmatrix(DL.submatrix(0,2,0,2), 0,0);
 		
 		rightHand = robot.get_hand_pose("right");
-		//rightHand.setSubmatrix(R.submatrix(0,2,0,2),0,0);
+		rightHand.setSubmatrix(DR.submatrix(0,2,0,2),0,0);
 	}
 	else if(input == "manipulability")
 	{
@@ -157,8 +273,7 @@ std::string process_command(const std::string &input, DualArmCtrl &robot)
 		}
 		case 2:
 		{
-			yarp::sig::Matrix temp;
-			robot.move_to_pose(leftHand, temp);
+			robot.move_to_pose(leftHand, rightHand);
 			break;
 		}
 		default:
