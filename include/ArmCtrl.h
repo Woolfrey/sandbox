@@ -70,7 +70,7 @@ bool ArmCtrl::set_cartesian_trajectory(const yarp::sig::Matrix &desired, const d
 	}
 	else
 	{
-		this->trajectory = CartesianTrajectory(this->arm.getH(), desired, 0.0, time);
+		this->trajectory = CartesianTrajectory(this->T, desired, 0.0, time);
 		return true;
 	}
 }
@@ -96,34 +96,22 @@ yarp::sig::Vector ArmCtrl::get_cartesian_control(const double &time)
 {
 	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state for the current time	
 	
-	return get_pose_error(pos, this->T);					// Feedforward + feedback
+	return this->vel + get_pose_error(this->pos, this->T);			// Feedforward + feedback
 }
 
 /******************** Get the pose error to perform feedback control ********************/
 yarp::sig::Vector ArmCtrl::get_pose_error(const yarp::sig::Matrix &desired, const yarp::sig::Matrix &actual)
 {
-	yarp::math::Quaternion qd, qa;
-	qd.fromRotationMatrix(desired.submatrix(0,2,0,2));
-	qa.fromRotationMatrix(desired.submatrix(0,2,0,2));
-	yarp::sig::Vector qe  = (qd*qa.inverse()).toVector();
+	yarp::sig::Matrix Re = desired.submatrix(0,2,0,2)*actual.submatrix(0,2,0,2).transposed();
+	yarp::sig::Vector axisAngle = yarp::math::dcm2axis(Re);
 	
-	double angle = 2*acos(qe[0]);
-	if(angle > M_PI)								// If the angle is greater than 180 degrees...
-	{
-		angle  = 2*M_PI - angle;						// ... take the shorter path...
-		qe[0] = cos(0.5*angle);							// ... and flip the axis to match
-		//for(int i = 0; i < 3; i++) qe[i+1] *= -1;
-	}
-	
-	yarp::sig::Vector error(6);
+	if(axisAngle[3] > M_PI)	axisAngle[3] = 2*M_PI - axisAngle[3];			// Take the shorter path
+
+	yarp::sig::Vector error(6);							// Value to be returned
 	for(int i = 0; i < 3; i++)
 	{
-		error[i] = desired[i][3] - actual[i][3];				// Difference in position
-		error[i+3] = 0;qe[i+3];							// Use the vector part of the quaternion error
+		error[i] 	= 2.0*(desired[i][3] - actual[i][3]);				// Translation error
+		error[i+3]	= axisAngle[3]*axisAngle[i];				// Should converge
 	}
-	
-	//yInfo("Here is the orientation error:");
-	//std::cout << 2*asin(error[3])*180/M_PI << " " << 2*asin(error[4])*180/M_PI << " " << 2*asin(error[5])*180/M_PI << std::endl;
-
 	return error;
 }
