@@ -59,8 +59,6 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		// Gradient Vectors
 		yarp::sig::Vector get_manip_grad(const std::string &which, const yarp::sig::Matrix &Jacobian);
 		yarp::sig::Vector get_force_grad(const std::string &which, const yarp::sig::Matrix &Jacobian, const yarp::sig::Vector &wrench);
-		
-
 			
 };									// Semicolon needed after class declaration
 
@@ -98,16 +96,16 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(1/freq)
 	this->rightArm.set_frequency(freq);
 	this->torso.set_frequency(freq);
 	
-	// Set a new base reference
-	yarp::sig::Matrix T = this->leftArm.get_base_pose();
-	T[2][3] = 0.65;
-	this->leftArm.set_base_pose(T);
+	// Set a new base reference for the left arm
+	yarp::sig::Matrix T = yarp::math::rpy2dcm(yarp::sig::Vector({0,0,M_PI}));	// Reverse rotation of origin to torso
+	T[2][3] = 0.65;									// Height of the torso
+	this->leftArm.set_base_pose(T*this->leftArm.get_base_pose());			// Set a new first pose
+	
+	// Set a new base reference for the right arm
+	this->rightArm.set_base_pose(T*this->rightArm.get_base_pose());
+	
 
-	T = this->rightArm.get_base_pose();
-	T[2][3] = 0.65;
-	this->rightArm.set_base_pose(T);
-
-	update_state();
+	update_state();									// Update the joint state
 }
 
 /******************** Get and set new joint state information ********************/
@@ -157,6 +155,11 @@ void DualArmCtrl::print_pose(const std::string &which)
 	{
 		yInfo("Here is the pose for the right hand:");
 		std::cout << this->rightArm.get_pose().toString() << std::endl;
+	}
+	else if(which == "base")
+	{
+		yInfo("Here is the pose for the base:");
+		std::cout << this->leftArm.get_base_pose().toString() << std::endl;
 	}
 }
 
@@ -224,8 +227,8 @@ void DualArmCtrl::move_to_pose(const yarp::sig::Matrix &left, const yarp::sig::M
 		this->controlSpace = 2;						// Switch case for control
 		
 		// Generate new Cartesian space trajectories internally
-		if(this->leftControl)	this->leftArm.set_cartesian_trajectory(left, 5.0);
-		if(this->rightControl)	this->rightArm.set_cartesian_trajectory(right, 5.0);
+		if(this->leftControl)	this->leftArm.set_cartesian_trajectory(left, 3.0);
+		if(this->rightControl)	this->rightArm.set_cartesian_trajectory(right, 3.0);
 		
 		start(); // Go immediately to threadInit()
 	}
