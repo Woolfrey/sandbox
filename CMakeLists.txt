@@ -13,20 +13,27 @@ include(ICUBcontribHelpers)
 include(ICUBcontribOptions)
 icubcontrib_set_default_prefix()
 
-
 include_directories(include)						# Location of header files
 
 add_subdirectory(gazebo)						# Location of other CMakeLists
 
 # A simple poem in haiku format
-add_executable(${PROJECT_NAME}-haiku src/haiku.cpp)
+add_executable(haiku src/haiku.cpp)
+
+# Simple position control in the joint space
+add_executable(position_control src/position_control.cpp)
+target_link_libraries(position_control ${YARP_LIBRARIES})
+
+# Custom joint space velocity control
+add_executable(velocity_control src/velocity_control.cpp)
+target_link_libraries(velocity_control ${YARP_LIBRARIES})
 
 # Playing around with Cartesian controller
-add_executable(${PROJECT_NAME}-cartesian_control src/cartesian_control.cpp)
-target_link_libraries(${PROJECT_NAME}-cartesian_control ${YARP_LIBRARIES} ICUB::iKin)
+add_executable(cartesian_control src/cartesian_control.cpp)
+target_link_libraries(cartesian_control ${YARP_LIBRARIES} ICUB::iKin)
 
 # Testing the threader class
-add_executable(${PROJECT_NAME}-threading src/threading.cpp)
-target_link_libraries(${PROJECT_NAME}-threading ${YARP_LIBRARIES})
+add_executable(threading src/threading.cpp)
+target_link_libraries(threading ${YARP_LIBRARIES})
 
 icubcontrib_add_uninstall_target()					# Enables uninstall
