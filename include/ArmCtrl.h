@@ -110,8 +110,8 @@ yarp::sig::Vector ArmCtrl::get_pose_error(const yarp::sig::Matrix &desired, cons
 	yarp::sig::Vector error(6);							// Value to be returned
 	for(int i = 0; i < 3; i++)
 	{
-		error[i] 	= 2.0*(desired[i][3] - actual[i][3]);				// Translation error
-		error[i+3]	= axisAngle[3]*axisAngle[i];				// Should converge
+		error[i] 	= 5.0*(desired[i][3] - actual[i][3]);				// Translation error
+		error[i+3]	= 5.0*axisAngle[3]*axisAngle[i];				// Should converge
 	}
 	return error;
 }

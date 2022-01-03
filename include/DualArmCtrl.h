@@ -21,8 +21,11 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 				yarp::sig::Vector &right,
 				yarp::sig::Vector &mid);
 				
-		void move_to_pose(const yarp::sig::Matrix &left,
+		void move_to_pose(const yarp::sig::Matrix &left,	// Move the hands to a desired pose
 				const yarp::sig::Matrix &right);
+				
+		void translate(const yarp::sig::Vector &left,		// Move the hands by a given amount
+				const yarp::sig::Vector &right);
 		
 		void set_redundant_task(const unsigned int &num, const double &scalar);
 		
@@ -33,7 +36,7 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		double elapsedTime, startTime;				// Used to regulate the control loop
 		double alpha = 1;					// Gain on the redundant task for GPM
 		int controlSpace = 100;					// 1 = Joint, 2 = Cartesian
-		int nullSpaceTask = 0;					// 0 = Nothing, 1 = Manipulability, 2 = Stiffness
+		int nullSpaceTask = 1;					// 0 = Nothing, 1 = Manipulability, 2 = Stiffness
 		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, qdot_d, vMin, vMax, gradL, gradR;
 		yarp::sig::Matrix J, JL, JR, W, I, N, dJdq;
 						
@@ -174,7 +177,7 @@ yarp::sig::Matrix DualArmCtrl::get_hand_pose(const std::string &which)
 		yarp::sig::Matrix temp(4,4);
 		return temp.eye();
 	}
-}	
+}
 
 /******************** Move the joints to desired configuration ********************/
 void DualArmCtrl::move_to_position(yarp::sig::Vector &left, yarp::sig::Vector &right, yarp::sig::Vector &mid)
@@ -204,6 +207,34 @@ void DualArmCtrl::move_to_position(yarp::sig::Vector &left, yarp::sig::Vector &r
 		if(this->rightControl)	this->rightArm.set_joint_trajectory(right);
 		
 		start(); // Go immediately to threadInit() 
+	}
+}
+/******************** Move the hands by the given amount ********************/
+void DualArmCtrl::translate(const yarp::sig::Vector &left, const yarp::sig::Vector &right)
+{
+	yarp::sig::Matrix TL, TR;						// Homogeneous transform
+
+	// Offset the left hand by the given amount
+	if(left.size() == 3)
+	{
+		TL = this->leftArm.get_pose();					// Get the pose of the left hand
+		for(int i = 0; i < 3; i++) TL[i][3] += left[i];			// Add the translation
+	}
+
+	// Offset the right hand by the given amount
+	if(right.size() == 3)
+	{
+		TR = this->rightArm.get_pose();					// Get the pose of the right hand
+		for(int i = 0; i < 3; i++) TR[i][3] += right[i];		// Add the translation
+	}
+	
+	// Send the control
+	if(TL.rows() != 0 || TR.rows() != 0) move_to_pose(TL, TR);
+	else
+	{
+		yError() << "DualArmCtrl::translate() : Incorrect dimensions for the input arguments!"
+			<< " The left vector has" << left.size() << "elements and the right vector has"
+			<< right.size() << "elements.";
 	}
 }
 

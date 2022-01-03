@@ -48,6 +48,7 @@ class JointCtrl
     		yarp::dev::IControlLimits*	limits;				// Joint limits?
 		yarp::dev::IControlMode*	mode;				// Sets the control mode of the motor
 		yarp::dev::IEncoders*		encoder;			// Joint position values (in degrees)
+		yarp::dev::IInteractionMode* 	interaction;			// Stiff or compliant
 		yarp::dev::IVelocityControl*	controller;			// Motor-level velocity controller
 		yarp::dev::PolyDriver		driver;				// Device driver
 		
@@ -174,6 +175,15 @@ bool JointCtrl::configure_drivers(const std::string &local_port_name,
 		
 		this->q = temp*M_PI/180;							// Make sure the values are in radians
 	}
+	
+	// Set the interaction mode for each of the joints
+	if(!this->driver.view(this->interaction))
+	{
+		yError() << "Unable to configure interaction mode for" << this->name + ".";
+		totalSuccess = false;
+	}
+	else for(int i = 0; i < this->n; i++) this->interaction->setInteractionMode(i, yarp::dev::VOCAB_IM_STIFF);
+	
 	if(totalSuccess) yInfo() << "Successfully configured drivers for the" << this->name + ".";
 	
 	return totalSuccess;
@@ -199,7 +209,7 @@ bool JointCtrl::set_joint_trajectory(yarp::sig::Vector &target)
 		
 		// Compute optimal time scaling
 		double dt, dq;
-		double endTime = 2.0;
+		double endTime = 1.0;
 		
 		for(int i = 0; i < this->n; i++)
 		{
