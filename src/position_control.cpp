@@ -11,25 +11,88 @@
 #include <yarp/os/RpcServer.h>					// Allows communication between ports
 #include <yarp/sig/Vector.h>						// Linear algebra for signal processing
 
-// Global variables
-int n;
-yarp::sig::Vector joint_position;					// Joint position information
-yarp::sig::Vector target;
-
-bool configureArmControl(yarp::dev::IEncoders &enc, yarp::dev::IPositionControl &controller)
-{
-
-	return true;
-}
 
 void getEncoderValues(yarp::dev::IEncoders &enc, yarp::sig::Vector &storage)
 {
-	//yarp::os::LogStream yInfo() << "Retrieving encoder information...";
 	while(!enc.getEncoders(storage.data()))
 	{
 		yarp::os::Time::delay(0.01);
 	}
-	//yarp::os::LogStream yInfo() << "Done.";
+}
+
+bool configureDriver(yarp::dev::PolyDriver &driver, std::string &local, std::string &remote)
+{
+	yarp::os::Property options;
+	options.put("device", "remote_controlboard");
+	options.put("local", local);				// Local port names
+	options.put("remote", remote);			// Where we want to connect to
+	
+	driver.open(options);
+	
+	if(!driver.isValid())					
+	{
+		// yError() << "Message.";
+		
+		std::printf("Device not available. Here are the known devices:\n");		// Inform user
+		std::printf("%s", yarp::dev::Drivers::factory().toString().c_str());	
+		return 0;									// Shut down
+	}			
+	else
+	{
+		// yInfo() << "Message";
+		
+		return 1;
+	}
+}
+
+bool configureControl(yarp::dev::PolyDriver &driver, yarp::dev::IPositionControl* &controller, yarp::sig::Vector &target)
+{
+	if(!driver.view(controller))
+	{
+		// yError() << "Message.";
+		
+		return 0;						// Unsuccessful
+	}
+	else
+	{
+		int n;
+		controller->getAxes(&n);				// Get the number of joints
+		
+		target.resize(n);					// Resize the target vector accordingly
+		
+		yarp::sig::Vector temp;				// Temporary storage vector
+		temp.resize(n);
+		
+		for(int i = 0; i < n; i++)
+		{
+			controller->setRefSpeed(i,20.0);		// Max speed (deg/s) for position controller
+			temp[i] = 50.0;				// (deg/s^2);
+		}
+		controller->setRefAccelerations(temp.data());		// WHY LIKE THIS?
+		
+		// yInfo() << "Message.";
+		
+		return 1;						// Success	
+	}
+}
+
+bool configureEncoder(yarp::dev::PolyDriver &driver, yarp::dev::IEncoders* &encoder, yarp::sig::Vector &position)
+{
+	if(!driver.view(encoder))
+	{
+		// yError() << "Message";
+		
+		return 0;						// Unsuccessful
+	}
+	else
+	{
+		int n;
+		encoder->getAxes(&n);					// Get the number of joints
+		position.resize(n);					// Resize position vector accordingly
+		getEncoderValues(*encoder, position);			// Assign initial values
+		// yInfo() << "Message";
+		return 1;						// Success
+	}
 }
 
 void home(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
@@ -39,7 +102,7 @@ void home(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 	setpoint[2] = 00.0;
 	setpoint[3] = 00.0;
 	setpoint[4] = 00.0;
-	control.positionMove(setpoint.data());			// Move to home position	
+	control.positionMove(setpoint.data());			// Move to home position
 }
 
 void receive(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
@@ -48,7 +111,7 @@ void receive(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 	setpoint[1] =  00.0;
 	setpoint[2] =  00.0;
 	setpoint[3] =  50.0;
-	setpoint[4] = -90.0;
+	setpoint[4] = -60.0;
 	control.positionMove(setpoint.data());			// Move to home position	
 }
 
@@ -64,118 +127,136 @@ void shake(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 
 void wave(yarp::sig::Vector &setpoint, yarp::dev::IPositionControl &control)
 {
-	setpoint[0] =  -30.0;
-	setpoint[1] =   50.0;
-	setpoint[2] =  -60.0;
-	setpoint[3] =  100.0;
-	setpoint[4] =   30.0;
-	control.positionMove(setpoint.data());			// Move to home position
+
+	for(int i = 0; i < 5; i++)
+	{
+		if(i%2)						// If i is exactly divisible by 2
+		{
+			setpoint[0] =  -30.0;
+			setpoint[1] =   50.0;
+			setpoint[2] =  -60.0;
+			setpoint[3] =   70.0;
+			setpoint[4] =   30.0;
+		}
+		else
+		{
+			setpoint[0] =  -30.0;
+			setpoint[1] =   50.0;
+			setpoint[2] =  -60.0;
+			setpoint[3] =  120.0;
+			setpoint[4] =   30.0;
+		}
+		
+		control.positionMove(setpoint.data());
+		
+		if(i == 0) 	yarp::os::Time::delay(1.0);
+		else		yarp::os::Time::delay(0.5);
+	}
+	
+	yarp::os::Time::delay(0.5);
+	
+	home(setpoint, control);
 }
 
 int main(int argc, char *argv[])
 {
 	yarp::os::Network yarp;					// Set up YARP
+
+	// Configure the left arm
+	std::string local = "/local/left";
+	std::string remote = "/icubSim/left_arm";
+	std::string name = "left_arm";			
+	yarp::dev::PolyDriver left_driver;				// Create device driver object
+	if(!configureDriver(left_driver, local, remote)) return 1;	// Configure and connect to iCub_SIM
+
+	yarp::dev::IPositionControl* left_control;
+	yarp::sig::Vector left_target;
+	if(!configureControl(left_driver, left_control, left_target)) return 1;
+	
+	yarp::dev::IEncoders* left_encoder;
+	yarp::sig::Vector left_position;
+	if(!configureEncoder(left_driver, left_encoder, left_position)) return 1;
+	
+	// Configure the right arm
+	local = "/local/right";
+	remote = "/icubSim/right_arm";
+	yarp::dev::PolyDriver right_driver;
+	if(!configureDriver(right_driver, local, remote)) return 1;
+	
+	yarp::dev::IPositionControl* right_control;
+	yarp::sig::Vector right_target;
+	if(!configureControl(right_driver, right_control, right_target)) return 1;
+	
+	yarp::dev::IEncoders* right_encoder;
+	yarp::sig::Vector right_position;
+	if(!configureEncoder(right_driver, right_encoder, right_position)) return 1;	
+	
+	// Move to starting position
+	left_target = left_position;					// Set initial values read from encoders
+	right_target = right_position;
+	home(left_target, *left_control);				// Move to pre-programmed joint configuration
+	home(right_target, *right_control);
 	
 	// Configure communication
 	yarp::os::RpcServer port;					// Create a port for sending and receiving information
 	port.open("/command");						// Open the port with the name /command
 	yarp::os::Bottle input;					// Store information from user input
 	yarp::os::Bottle output;					// Store information to send to user
-	std::string answer;						// Response message
+	std::string command;						// Response message, command from user
 	
-	
-	// Configure the robot
-	yarp::os::Property options;
- 	options.put("device", "remote_controlboard");
- 	options.put("local", "/test/client");				// Local port names
- 	options.put("remote", "/icubSim/right_arm");			// Where we want to connect to
- 	yarp::dev::PolyDriver robotDevice(options);			// Create device driver for the specified robot
-  	if(!robotDevice.isValid())					
- 	{
- 		std::printf("Device not available. Here are the known devices:\n");		// Inform user
- 		std::printf("%s", yarp::dev::Drivers::factory().toString().c_str());	
- 		return 0;									// Shut down
- 	}
- 	
- 	
- 	// Configure controller
- 	yarp::dev::IPositionControl *controller;			// Requires a pointer?
- 	if(!robotDevice.view(controller));// yarp::os::Network yError() << "Problems acquiring controller interface.";
- 	controller->getAxes(&n);					// Get the number of motors that can be controlled
- 	target.resize(n);						// Resize vector for target joint positiosn
-	yarp::sig::Vector temp;					// Temporary storage vector
-	temp.resize(n);						// Resize temp storage vector
- 	for(int i = 0; i < n; i++)					// Iterate through each joint...
- 	{
- 		controller->setRefSpeed(i,30.0);			// Set reference speed (deg/s) for position controller
- 		temp[i] = 80;						// Acceleration (deg/s^2)
- 	}		
- 	controller->setRefAccelerations(temp.data());			// Set reference accelerations (deg/s^2) (WHY LIKE THIS?)
- 	
- 	
- 	// Configure encoder information
- 	yarp::dev::IEncoders *encoders;				// Needs a pointer for some reason?
- 	if(!robotDevice.view(encoders));//yarp::os::LogStream yError() << "Problems acquiring encoder interface.";
- 	joint_position.resize(n);					// Joint position information to be received from the encoders
- 	
- 	
- 	// Get and set initial joint values
- 	getEncoderValues(*encoders, joint_position);
- 	target = joint_position;
- 	home(target, *controller);
- 	
- 	
 	// Receive commands and respond appropriately	
 	bool run = true;
 	while(run)
 	{
-		output.clear();							// Clear any previous information
+		output.clear();					// Remove any previous information
 		
-		port.read(input,true);							// Get the input command
-		std::string command = input.toString();				// Convert to string data type
+		port.read(input, true);				// Get input commands
+		command = input.toString();				// Convert to string data type
 		
-		
-		// Figure out the appropriate response
+		// Shut down the executable
 		if(command == "close")
 		{
-			home(target,*controller);
+			home(left_target, *left_control);
+			home(right_target, *right_control);
 			output.addString("Arrivederci");
-			run = false;							// This will terminate the while loop
+			run = false;
 		}
 		
-		
+		// Move arms to the starting position
 		else if(command == "home")
 		{
-			home(target, *controller);					// Move to home position
-			output.addString("A casa");
+			home(left_target, *left_control);
+			home(right_target, *right_control);
+			output.addString("aCasa");
 		}
 		
-		// Get the current joint positions
-		else if(command == "read")
+		// Read the joint positions from the encoders
+		else if(command == "read right")
 		{
-		
-			
-			getEncoderValues(*encoders,joint_position);
+			getEncoderValues(*right_encoder, right_position);
+			int n;
+			right_encoder->getAxes(&n);
 			
 			for(int i = 0; i < n; i++)
 			{
-				output.addDouble(joint_position[i]);
+				
 			}
 		}
 		
-		
-		// Extend both arms
+		// Extend arms to receive an object		
 		else if(command == "receive")
 		{
-			receive(target, *controller);
+			receive(left_target, *left_control);
+			receive(right_target, *right_control);
 			output.addString("Grazie");
 		}
 		
 		
-		// Extend one arm
+		// Extend one arm 
 		else if(command == "shake")
 		{
-			shake(target, *controller);
+			home(left_target, *left_control);
+			shake(right_target, *right_control);
 			output.addString("Piacere");
 		}
 		
@@ -183,7 +264,8 @@ int main(int argc, char *argv[])
 		// Wave one arm
 		else if(command == "wave")
 		{
-			wave(target, *controller);
+			home(left_target, *left_control);
+			wave(right_target, *right_control);
 			output.addString("Ciao");
 		}
 		
@@ -195,8 +277,8 @@ int main(int argc, char *argv[])
 		}	
 	
 		port.reply(output);							// Send to the user
+
     	}
-	
-	robotDevice.close();								// Close connection with the robot
+    	
 	return 0;									// No problems with main
 }
