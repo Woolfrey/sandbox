@@ -403,7 +403,7 @@ void DualArmCtrl::scale_vector(yarp::sig::Vector &input, const yarp::sig::Vector
 	for(int i = 0; i < 17; i++)
 	{
 		// Get the speed limits for the current joint
-		if(i < 3)		this->torso.get_speed_limits(2-i, vMin, vMax);		// Joints 0 - 2   : Torso
+		if(i < 3)		this->torso.get_speed_limits(2-i, vMin, vMax);		// Joints 0 - 2   : Torso (N.B. in reverse order!)
 		else if(i < 10)		this->leftArm.get_speed_limits(i-3, vMin, vMax);	// Joints 3 - 9   : Left Arm
 		else if(i < 17)		this->rightArm.get_speed_limits(i-10, vMin, vMax);	// Joints 10 - 16 : Right Arm
 		
@@ -460,7 +460,6 @@ yarp::sig::Matrix DualArmCtrl::get_inverse(const yarp::sig::Matrix &A)
 			else			invA(i,j) += V(i,j)/s(j);
 		}
 	}
-	
 	return invA*U.transposed();							// Complete the inversion and return	
 }
 
@@ -511,87 +510,4 @@ yarp::sig::Vector DualArmCtrl::get_force_grad(const std::string &which, const ya
 	}
 	return grad;
 }
-
-/******************** Cartesian Control Functions ********************
-void DualArmCtrl::move_lateral(const double &distance)
-{
-	if(isRunning()) stop();							// Stop any control threads
-	
-	this->controlSpace = 2;							// Switch case for Cartesian control
-	
-	// Compute the left arm control
-	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
-	H[1][3] -= distance;							// OPPOSITE GLOBAL FRAME
-	this->leftArm.set_cartesian_trajectory(H, 2.0);				// Set the internal trajectory object
-	this->leftControl = true;
-	
-	// Compute the right arm control
-	H = this->rightArm.get_pose();
-	H[1][3] -= distance;
-	this->rightArm.set_cartesian_trajectory(H, 2.0);
-	this->rightControl = true;
-	
-	start(); // Go immediately to initThread();
-}
-void DualArmCtrl::move_vertical(const double &distance)
-{
-	if(isRunning()) stop();							// Stop any control threads
-	
-	this->controlSpace = 2;							// Switch case for Cartesian control
-	
-	// Compute the left arm control
-	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
-	H[2][3] += distance;							// Offset the z-position
-	this->leftArm.set_cartesian_trajectory(H, 2.0);				// Set the internal trajectory object
-	this->leftControl = true;
-	
-	// Compute the right arm control
-	H = this->rightArm.get_pose();
-	H[2][3] += distance;							// Offset the z position
-	this->rightArm.set_cartesian_trajectory(H, 2.0);
-	this->rightControl = true;
-	
-	start(); // Go immediately to initThread();
-}
-void DualArmCtrl::move_in_out(const double &distance)
-{
-	if(isRunning()) stop();							// Stop any control threads
-	
-	this->controlSpace = 2;							// Switch case for Cartesian control
-	
-	// Compute the left arm control
-	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
-	H[1][3] += distance;							// Offset the y-position
-	this->leftArm.set_cartesian_trajectory(H, 2.0);				// Set the internal trajectory object
-	this->leftControl = true;
-	
-	// Compute the right arm control
-	H = this->rightArm.get_pose();
-	H[1][3] -= distance;
-	this->rightArm.set_cartesian_trajectory(H, 2.0);
-	this->rightControl = true;
-	
-	start(); // Go immediately to initThread();
-}
-void DualArmCtrl::move_horizontal(const double &distance)
-{
-	if(isRunning()) stop();							// Stop any control threads
-	
-	this->controlSpace = 2;							// Switch case for Cartesian control
-	
-	// Compute the left arm control
-	yarp::sig::Matrix H = this->leftArm.get_pose();				// Get the pose of the left hand
-	H[0][3] -= distance;							// Offset the y-position
-	this->leftArm.set_cartesian_trajectory(H, 2.0);				// Set the internal trajectory object
-	this->leftControl = true;
-	
-	// Compute the right arm control
-	H = this->rightArm.get_pose();
-	H[0][3] -= distance;
-	this->rightArm.set_cartesian_trajectory(H, 2.0);
-	this->rightControl = true;
-	
-	start(); // Go immediately to initThread();
-}
-*/
 
