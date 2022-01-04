@@ -33,12 +33,11 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		// Variables
 		bool leftControl = false;
 		bool rightControl = false;
-		double elapsedTime, startTime;				// Used to regulate the control loop
+		double startTime;					// Used to regulate the control loop
 		double alpha = 1;					// Gain on the redundant task for GPM
 		int controlSpace = 100;					// 1 = Joint, 2 = Cartesian
 		int nullSpaceTask = 1;					// 0 = Nothing, 1 = Manipulability, 2 = Stiffness
-		yarp::sig::Vector xdot, q, qdot, qdot_R, qdot_N, qdot_d, vMin, vMax, gradL, gradR;
-		yarp::sig::Matrix J, JL, JR, W, I, N, dJdq;
+		yarp::sig::Vector q;					// Joint position vector
 						
 		// Objects
 		ArmCtrl leftArm, rightArm;				// Handles kinematics for the arms
@@ -50,9 +49,8 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		void threadRelease();					// Executed after stop is called
 			
 		// Joint Limit Avoidance Functions
-		void get_joint_weighting();				// For joint limit avoidance in RMRC
+		yarp::sig::Matrix get_joint_weighting();		// For joint limit avoidance in RMRC
 		void scale_vector(yarp::sig::Vector &input, const yarp::sig::Vector ref); // Scale a vector based on speed limits
-		void update_speed_limits();				// Get the min. and max. velocity for each joint		
 		
 		// Math Functions
 		double dot_product(const yarp::sig::Vector &a, const yarp::sig::Vector &b);
@@ -68,27 +66,6 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 /******************** Constructor ********************/
 DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(1/freq)
 {
-	// Resize vectors
-	this->xdot.resize(12);						// Task velocity vector
-	this->qdot.resize(17);						// Joint velocity vector for both arms
-	this->qdot_R.resize(17);					// Range space task
-	this->qdot_N.resize(17);					// Null space task
-	this->q.resize(10);						// Joint position for a single kinematic chain
-	this->qdot_d.resize(17);
-	this->vMin.resize(17);						// Minimum speed for the joints
-	this->vMax.resize(17);						// Maximum speed for the joints
-	this->gradL.resize(10);
-	this->gradR.resize(10);						// Gradient vectors
-		
-	// Resize matrices
-	this->J.resize(12,17);						// Jacobian for both arms
-	this->W.resize(17,17);						// Weighting matrix for RMRC
-		this->W.eye();
-	this->I.resize(17,17);						// Identity matrix
-		this->I.eye();
-	this->N.resize(17,17);						// Null space projection matrix	
-	this->dJdq.resize(6,10);					// Partial derivative of the Jacobian			
-
 	// Configure the device drivers for different parts of the robot
 	this->leftArm.configure("/local/left", "/icubSim/left_arm", "left");
 	this->rightArm.configure("/local/right", "/icubSim/right_arm", "right");
@@ -107,7 +84,6 @@ DualArmCtrl::DualArmCtrl(const double &freq) : yarp::os::PeriodicThread(1/freq)
 	// Set a new base reference for the right arm
 	this->rightArm.set_base_pose(T*this->rightArm.get_base_pose());
 	
-
 	update_state();									// Update the joint state
 }
 
@@ -121,17 +97,17 @@ bool DualArmCtrl::update_state()
 	
 	if(success)
 	{
-		yarp::sig::Vector temp = this->torso.get_joint_positions();	// Get the joint positions from the torso
-		for(int i = 0; i < 3; i++) this->q[i] = temp[2-i];		// Assign torso joints (in reverse order)
+		yarp::sig::Vector q(10);						
+		yarp::sig::Vector temp = this->torso.get_joint_positions();		// Get the joint positions from the torso
+		for(int i = 0; i < 3; i++) q[i] = temp[2-i];				// Assign torso joints (in reverse order)
 		
-		this->q.setSubvector(3, this->leftArm.get_joint_positions());	// Get the joint positions from the left arm
-		this->leftArm.set_joint_angles(q);				// Assign them to the iCubArm object
+		q.setSubvector(3, this->leftArm.get_joint_positions());			// Get the joint positions from the left arm
+		this->leftArm.set_joint_angles(q);					// Assign them to the iCubArm object in this class
 		
-		this->q.setSubvector(3, this->rightArm.get_joint_positions());	// Overwrite with the right arm joints
-		this->rightArm.set_joint_angles(q);				// Assign them to the iCubArm object
-		
+		q.setSubvector(3, this->rightArm.get_joint_positions());		// Overwrite with the right arm joints
+		this->rightArm.set_joint_angles(q);					// Assign them to the iCubArm object in this class
 	}
-	else	close();							// There was a problem, so shut down the robot
+	else	close();								// There was a problem, so shut down the robot
 	
 	return	success;
 }
@@ -284,98 +260,97 @@ void DualArmCtrl::run()
 {
 	update_state();								// Update the joint state information
 	
-	this->elapsedTime = yarp::os::Time::now() - this->startTime;		// Update the time in the control loop
+	double elapsedTime = yarp::os::Time::now() - this->startTime;		// Update the time in the control loop
 	
 	// Solve the relevant control
 	switch(this->controlSpace)
 	{
 		case 1: // Joint control
 		{
-			this->torso.track_joint_trajectory(this->elapsedTime);
-			if(this->leftControl)	this->leftArm.track_joint_trajectory(this->elapsedTime);
-			if(this->rightControl)	this->rightArm.track_joint_trajectory(this->elapsedTime);
+			this->torso.track_joint_trajectory(elapsedTime);
+			if(this->leftControl)	this->leftArm.track_joint_trajectory(elapsedTime);
+			if(this->rightControl)	this->rightArm.track_joint_trajectory(elapsedTime);
 			break;
 		}
 		case 2: // Cartesian control
 		{
-			this->J.zero();							// Clear the Jacobian
-			this->xdot.zero();						// Clear the task vector
+		
+			// Variables used in this scope
+			yarp::sig::Matrix J(12,17);					// Combined Jacobian for both arms
+			yarp::sig::Matrix JLeft, JRight;				// Sub matrices for left, right arm	
+			yarp::sig::Vector xdot(12);					// Combined task Jacobian
 			
-			// Left hand control component
-			if(this->leftControl)						// Left arm control active
-			{	
-				// Solve the Cartesian control part
-				this->xdot.setSubvector(0,this->leftArm.get_cartesian_control(this->elapsedTime));
-				
-				// Construct the Jacobian
-				this->JL = this->leftArm.get_jacobian();
-				this->J.setSubmatrix(this->JL,0,0);			// Effect on left hand
-			}
-			
-			// Right hand control component
-			if(this->rightControl)						// Right arm control active
+			if(this->leftControl)						// If left arm control is active...
 			{
-				// Solve the Cartesian control part
-				this->xdot.setSubvector(6,this->rightArm.get_cartesian_control(this->elapsedTime));
-				
-				// Construct the Jacobian
-				this->JR = this->rightArm.get_jacobian();
-				this->J.setSubmatrix(this->JR.submatrix(0,5,0,2),6,0);	// Assign torso effect for right hand
-				this->J.setSubmatrix(this->JR.submatrix(0,5,3,9),6,10);	// Assign arm effect for the right hand
+				xdot.setSubvector(0, this->leftArm.get_cartesian_control(elapsedTime));
+				JLeft = this->leftArm.get_jacobian();
+				J.setSubmatrix(JLeft, 0, 0);
 			}
-				
-			// Solve differential inverse kinematics
-			get_joint_weighting();						// NOTE: This is already the inverse!
-			yarp::sig::Matrix invWJt = this->W*this->J.transposed();	// This makes calcs a little easier
-			yarp::sig::Matrix invJ = invWJt*get_inverse(this->J*invWJt);	// Get the pseudoinverse
-			this->qdot_R = invJ*this->xdot;					// Range space task
 			
-			switch(this->nullSpaceTask)
+			if(this->rightControl)						// If right arm control is active...
 			{
-				case 1:
-				{
-					this->gradL = get_manip_grad("left", this->JL);
-					this->gradR = get_manip_grad("right", this->JR);
-					break;
-				}
-				case 2:
-				{
-					yarp::sig::Vector force({0, 0, 1, 0, 0, 0});
-					this->gradL = get_force_grad("left", this->JL, force);
-					this->gradR = get_force_grad("right", this->JR, force);
-					break;
-				}
-				default:
-				{
-					this->gradL.zero();
-					this->gradR.zero();
-					break;
-				}
+				xdot.setSubvector(6, this->rightArm.get_cartesian_control(elapsedTime));
+				JRight = this->rightArm.get_jacobian();
+				J.setSubmatrix(JRight.submatrix(0,5,0,2),6,0);
+				J.setSubmatrix(JRight.submatrix(0,5,3,9),6,10);
 			}
 			
-			for(int i = 0; i < 7; i++)
-			{
-				if(i < 3) this->qdot[i] = (this->gradL[i] + this->gradR[i])/2;
-				this->qdot_d[i+3]  = this->gradL[i+3];
-				this->qdot_d[i+10] = this->gradR[i+3];
-			}
-			this->qdot_d *= this->alpha;					// Scale the gradient
-			
-			// Project the redundant task on the null space and add it
-			this->N = this->I - invJ*this->J;				// Null space projection matrix
-			this->qdot_N = this->N*this->qdot_d;				// Project the desired velocity on the null space
-			this->qdot = this->qdot_R + this->qdot_N;			// Combine the range space and null space task
-			
-			// Scale the vectors so they remain within joint limits
-			update_speed_limits();						// Get new limits based on current state
-			scale_vector(this->qdot_R, this->qdot_R);			// Scale range space vector to obey limits
-			scale_vector(this->qdot_N, this->qdot);				// Scale null space task to obey joint limits
-			this->qdot = this->qdot_R + this->qdot_N;			// Recombine the range and null vectors after scaling
+			// Solve the differential inverse kinematics
+			yarp::sig::Matrix W = get_joint_weighting();			// NOTE: ALREADY THE INVERSE
+			yarp::sig::Matrix invWJt = W*J.transposed();			// Makes calcs a little easier
+			yarp::sig::Matrix invJ = invWJt*get_inverse(J*invWJt);		// W^-1*J'*(J*W^-1*J')^-1
+			yarp::sig::Vector qdot_R = invJ*xdot;				// Range space task
+			scale_vector(qdot_R, qdot_R);					// Ensure kinematic feasibility
+		
+			// Compute the null space motion
+			yarp::sig::Vector qdot_N(17);					// Null space task
 
+			if(this->nullSpaceTask != 0)
+			{
+				yarp::sig::Vector gradL(10), gradR(10);			// Left and right hand gradient vectors
+				switch(this->nullSpaceTask)
+				{
+					case 1:
+					{
+						gradL = get_manip_grad("left", JLeft);
+						gradR = get_manip_grad("right", JRight);
+						break;
+					}
+					case 2:
+					{
+						yarp::sig::Vector direction({0,0,1,0,0,0});
+						gradL = get_force_grad("left", JLeft, direction);
+						gradR = get_force_grad("right", JRight, direction);
+						break;
+					}
+					default:
+					{
+						gradL.zero();
+						gradR.zero();
+					}
+				}
+				
+				yarp::sig::Vector qdot_d(17);
+				for(int i = 0; i < 7; i++)
+				{
+					if(i < 3)	qdot_d[i]    = (gradL[i] + gradR[i])/2; // Mean of the two torso components
+							qdot_d[i+3]  = gradL[i+3];	// Left arm
+							qdot_d[i+10] = gradR[i+3];	// Right arm
+				}
+				qdot_d *= this->alpha;					// Scale it
+				
+				// Project the desired task on to the null space
+				yarp::sig::Matrix I(17,17); I.eye();			// Identity matrix
+				qdot_N = (I - invJ*J)*qdot_d;				// Null space projection
+			}
+		
+			yarp::sig::Vector qdot = qdot_R + qdot_N;			// Combine the range and null space vectors
+			scale_vector(qdot_N, qdot);					// Ensure feasibility of the null space task
+					
 			// Send the commands to the motors
-			this->torso.move_at_speed(yarp::sig::Vector({this->qdot[2], this->qdot[1], this->qdot[0]})); // IN REVERSE ORDER
-			this->leftArm.move_at_speed(this->qdot.subVector(3,9));
-			this->rightArm.move_at_speed(this->qdot.subVector(10,16));
+			this->torso.move_at_speed(yarp::sig::Vector({qdot[2], qdot[1], qdot[0]})); // IN REVERSE ORDER
+			this->leftArm.move_at_speed(qdot.subVector(3,9));
+			this->rightArm.move_at_speed(qdot.subVector(10,16));
 
 			break;
 		}
@@ -386,7 +361,7 @@ void DualArmCtrl::run()
 			yInfo() << "The Queen is their slave.";
 			break;
 		}
-	}	
+	}
 	// Run this function repeatedly until stop() is called, then go to threadRelease();
 }
 
@@ -404,49 +379,38 @@ void DualArmCtrl::threadRelease()
 }
 
 /******************** Get the joint weighting matrix ********************/
-void DualArmCtrl::get_joint_weighting()
+yarp::sig::Matrix DualArmCtrl::get_joint_weighting()
 {
 	// Note to self: It's easier to compute the penalty function in
 	// the MultiJointController class and send the result here.
 	
-	for(int i = 0; i < 3; i++) this->W[i][i] = this->torso.get_joint_weight(2-i);	// Torso joints are backwards in the kinematic chain
+	yarp::sig::Matrix W(17,17);							// Value to be returned
+	
+	for(int i = 0; i < 3; i++)	W[i][i] = this->torso.get_joint_weight(2-i);	// Torso joints are backwards in the kinematic chain
 	for(int i = 0; i < 7; i++)
 	{
-		this->W[i+3][i+3]	= this->leftArm.get_joint_weight(i);
-		this->W[i+10][i+10]	= this->rightArm.get_joint_weight(i);	
+					W[i+3][i+3] = this->leftArm.get_joint_weight(i);
+					W[i+10][i+10] = this->rightArm.get_joint_weight(i);	
 	}
+	return W;
 }
 
 /******************** Scale a task vector to remain within joint limits ********************/
 void DualArmCtrl::scale_vector(yarp::sig::Vector &input, const yarp::sig::Vector ref)
 {
-	double s = 1.0;
-	for(int i = 0; i < ref.size(); i++)
+	double s = 1.0;										// Scaling value
+	double vMin, vMax;									// Maximum and minimum speed limits for a joint
+	for(int i = 0; i < 17; i++)
 	{
-		if(ref[i] >= this->vMax[i] && this->vMax[i]/ref[i] < s)			// If ref is above limits AND largest observed so far...
-		{
-			s = 0.99*this->vMax[i]/ref[i];					// ... update the scalar
-		}
-		else if(ref[i] < this->vMin[i] && this->vMin[i]/ref[i] < s)		// Else if ref is below limits AND largest observed so far...
-		{
-			s = 0.99*this->vMin[i]/ref[i];					// ... update the scalar
-		}
+		// Get the speed limits for the current joint
+		if(i < 3)		this->torso.get_speed_limits(2-i, vMin, vMax);		// Joints 0 - 2   : Torso
+		else if(i < 10)		this->leftArm.get_speed_limits(i-3, vMin, vMax);	// Joints 3 - 9   : Left Arm
+		else if(i < 17)		this->rightArm.get_speed_limits(i-10, vMin, vMax);	// Joints 10 - 16 : Right Arm
+		
+		if(ref[i] <= vMin && vMin/ref[i] < s) s = 0.99*vMin/ref[i];			// Scale if below limits and largest violation so far
+		if(ref[i] >= vMax && vMax/ref[i] < s) s = 0.99*vMax/ref[i];			// Scale if above limits and largest violation so far
 	}
-	input *= s;									// Return the scaled vector
-}
-
-/******************** Update the minimum and maximum permissable joint velocities ********************/
-void DualArmCtrl::update_speed_limits()
-{
-	for(int i = 0; i < 3; i++)
-	{
-		this->torso.get_speed_limits(2-i, this->vMin[i], this->vMax[i]);	// Torso joints are backwards
-	}
-	for(int i = 0; i < 7; i++)
-	{
-		this->leftArm.get_speed_limits(i, this->vMin[i+3], this->vMax[i+3]);
-		this->rightArm.get_speed_limits(i,this->vMin[i+10],this->vMax[i+10]);
-	}
+	input *= s;										// Return the scaled vector
 }
 
 /******************** Get the dot product between 2 vectors ********************/
@@ -504,6 +468,7 @@ yarp::sig::Matrix DualArmCtrl::get_inverse(const yarp::sig::Matrix &A)
 yarp::sig::Vector DualArmCtrl::get_manip_grad(const std::string &which, const yarp::sig::Matrix &Jacobian)
 {
 	// Variables to be used
+	yarp::sig::Matrix dJdq;
 	yarp::sig::Matrix JJt = Jacobian*Jacobian.transposed();				// Makes calcs a little faster
 	double mu = sqrt(yarp::math::det(JJt));						// Measure of manipulability
 	yarp::sig::Matrix invJJt = get_inverse(JJt);					// Makes calcs a little faster
@@ -517,10 +482,10 @@ yarp::sig::Vector DualArmCtrl::get_manip_grad(const std::string &which, const ya
 	// Compute the gradient vector
 	for(int i = 0; i < 10; i++)
 	{
-		if(which == "left")		this->dJdq = this->leftArm.get_partial_jacobian(i);
-		else if(which == "right")	this->dJdq = this->rightArm.get_partial_jacobian(i);
+		if(which == "left")		dJdq = this->leftArm.get_partial_jacobian(i);
+		else if(which == "right")	dJdq = this->rightArm.get_partial_jacobian(i);
 
-		grad[i] = mu*trace(this->dJdq*Jacobian.transposed()*invJJt);
+		grad[i] = mu*trace(dJdq*Jacobian.transposed()*invJJt);
 	}
 	return grad;
 }
@@ -533,15 +498,16 @@ yarp::sig::Vector DualArmCtrl::get_force_grad(const std::string &which, const ya
 	else if(which == "right")	this->rightArm.prep_for_hessian();
 	else				yError("DualArmCtrl::get_force_grad() : Expected 'left' or 'right' as an argument.");
 
+	yarp::sig::Matrix dJdq;
 	yarp::sig::Vector Jtw = Jacobian.transposed()*wrench;				// Makes calcs a little faster
 	yarp::sig::Vector grad(10);							// Value to be returned
 	
 	for(int i = 0; i < 10; i++)
 	{
-		if(which == "left")		this->dJdq = this->leftArm.get_partial_jacobian(i);
-		else if(which == "right")	this->dJdq = this->leftArm.get_partial_jacobian(i);
+		if(which == "left")		dJdq = this->leftArm.get_partial_jacobian(i);
+		else if(which == "right")	dJdq = this->rightArm.get_partial_jacobian(i);
 		
-		grad[i] = dot_product(this->dJdq.transposed()*wrench, Jtw);
+		grad[i] = dot_product(dJdq.transposed()*wrench, Jtw);
 	}
 	return grad;
 }
