@@ -36,4 +36,8 @@ target_link_libraries(cartesian_control ${YARP_LIBRARIES} ICUB::iKin)
 add_executable(threading src/threading.cpp)
 target_link_libraries(threading ${YARP_LIBRARIES})
 
+# Demonstrates stiffness optimization
+add_executable(stiffness_control src/stiffness_control.cpp)
+target_link_libraries(stiffness_control ${YARP_LIBRARIES} ICUB::iKin)
+
 icubcontrib_add_uninstall_target()					# Enables uninstall
