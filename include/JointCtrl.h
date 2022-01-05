@@ -41,8 +41,6 @@ class JointCtrl
 		Quintic trajectory;						// Joint-level trajectory generator
 		
 		yarp::sig::Vector q, qdot;					// Joint position and velocity
-		yarp::sig::Vector qMin, qMax, range, vLim;			// Position and velocity limits
-		yarp::sig::Vector pos, vel, acc;				// Desired state for control purposes
 		
 	   	// These interface with the hardware
     		yarp::dev::IControlLimits*	limits;				// Joint limits?
@@ -82,13 +80,6 @@ bool JointCtrl::configure_drivers(const std::string &local_port_name,
 	// Resize vectors
 	this->q.resize(this->n);							// Actual joint position vector
 	this->qdot.resize(this->n);							// Actual joint velocity vector
-	this->qMin.resize(this->n);							// Lower joint limits
-	this->qMax.resize(this->n);							// Upper joint limits
-	this->range.resize(this->n);							// Range between joint limits
-	this->vLim.resize(this->n);							// Joint speed limit
-	this->pos.resize(this->n);							// Desired joint position vector
-	this->vel.resize(this->n);							// Desired joint velocity vector
-	this->acc.resize(this->n);							// Desired joint acceleration vector
 	
 	// First configure the device driver
 	yarp::os::Property options;
@@ -132,21 +123,6 @@ bool JointCtrl::configure_drivers(const std::string &local_port_name,
 	{
 		yError() << "Unable to obtain joint limits for" << this->name + ".";
 		totalSuccess = false;
-	}
-	else
-	{
-		// Save them internally in radians for later use
-		double vMin;									// Not really used
-		for(int i = 0; i < this->n; i++)
-		{
-			this->limits->getLimits(i, &this->qMin[i], &this->qMax[i]);
-			this->limits->getVelLimits(i, &vMin, &this->vLim[i]);			// vMin is always zero
-		}
-		
-		this->qMin *= M_PI/180;								// Convert to radians
-		this->qMax *= M_PI/180;
-		this->range = this->qMax - this->qMin;						// This is used in joint limit avoidance
-		this->vLim *= M_PI/180;								// Convert to rad/s
 	}
 	
 	// Finally, configure the encoders
@@ -201,23 +177,28 @@ bool JointCtrl::set_joint_trajectory(yarp::sig::Vector &target)
 	else
 	{
 		// Ensure the target is within joint limits
+		double qMin, qMax;
 		for(int i = 0; i < this->n; i++)
 		{
-			if(target[i] > this->qMax[i])	target[i] = this->qMax[i] - 0.01;
-			if(target[i] < this->qMin[i])	target[i] = this->qMin[i] + 0.01;
+			this->limits->getLimits(i, &qMin, &qMax);			// Get the position limits for the ith joint
+			qMax *= M_PI/180;
+			qMin *= M_PI/180;
+			if(target[i] < qMin) target[i] = qMin + 0.01;			// If target is below limit, set it just above
+			if(target[i] > qMax) target[i] = qMax - 0.01;			// If target is just above limit, set it just below
 		}
 		
 		// Compute optimal time scaling
-		double dt, dq;
+		double dt, dq, vMin, vMax;
 		double endTime = 1.0;
-		
 		for(int i = 0; i < this->n; i++)
 		{
 			dq = abs(target[i] - this->q[i]);				// Distance to target
-			if(dq > 0)	dt = (15*dq)/(8*this->vLim[i]);			// Optimal time scaling at peak velocity
+			this->limits->getVelLimits(i, &vMin, &vMax);
+			vMax *= M_PI/180;
+			if(dq > 0) dt = (15*dq)/(8*vMax);				// Optimal time scaling at peak velocity
 			if(dt > endTime) endTime = dt;
 		}
-		
+		endTime;								// Increase it a little bit
 		this->trajectory = Quintic(this->q, target, 0.0, endTime);
 		return true;
 	}
@@ -241,8 +222,9 @@ bool JointCtrl::move_at_speed(const yarp::sig::Vector &speed)
 /******************** Return feedback control to track trajectory object ********************/
 void JointCtrl::track_joint_trajectory(const double &time)
 {
-	this->trajectory.get_state(this->pos, this->vel, this->acc, time);		// Get the desired state from the trajectory object
-	move_at_speed(this->vel + 1.0*(this->pos - this->q));				// Send commands to the motors
+	yarp::sig::Vector pos(this->n), vel(this->n), acc(this->n);
+	this->trajectory.get_state(pos, vel, acc, time);				// Get the desired state from the trajectory object
+	move_at_speed(vel + 2.0*(pos - this->q));					// Send commands to the motors
 }
 
 /******************** Get new joint encoder information ********************/
@@ -258,54 +240,43 @@ bool JointCtrl::read_encoders()
 	
 	this->q *= M_PI/180;							// Convert to radians
 	this->qdot *= M_PI/180;							// Convert to rad/s
-	
-	// Sensor noise can make the values go over the limits.
-	for(int i = 0; i < this->n; i++)
-	{
-		if(this->q[i] > this->qMax[i])		this->q[i] = this->qMax[i];
-		else if(this->q[i] < this->qMin[i])	this->q[i] = this->qMin[i];
-	}
 
 	if(!success) yError() << "ArmController::update_state() : Could not obtain encoder values for " << this->name + ".";
 	
 	return success;
 }
 
-/******************** Get the min, max speed for each joint to avoid limits ********************/
-bool JointCtrl::get_speed_limits(const int &i, double &lower, double &upper)
+/******************** Get the speed limits for a joint ********************/
+bool JointCtrl::get_speed_limits(const int &i, double &vMin, double &vMax)
 {
-	double temp = this->hertz*(this->qMax[i] - this->q[i]);				// Maximum speed to reach upper joint limit
-
-	if(this->vLim[i] > temp)	upper = temp;
-	else				upper = this->vLim[i];
-	
-	temp = this->hertz*(this->qMin[i] - this->q[i]);				// Minimum speed to reach lower limit
-	
-	if(-1*this->vLim[i] < temp)	lower = temp;
-	else				lower = -1*this->vLim[i];
-	
-	return true; // Not sure what to do with this
+	if(this->limits->getLimits(i, &vMin, &vMax))
+	{
+		vMax *= M_PI/180;
+		vMin = -vMax;
+		return true;
+	}
+	else return false;
 }
 
 /******************** Get the penalty term for avoiding joint limits ********************/
 double JointCtrl::get_joint_weight(const int &i)
-{
-	this->upper = this->qMax[i] - this->q[i];					// Distance to upper limit
-	this->lower = this->q[i] - this->qMin[i];					// Distance to lower limit
-	this->dpdq = (pow(this->range[i],2)*(2*this->q[i] - this->qMax[i] - this->qMin[i]))/
-			(4*pow(this->upper,2)*pow(this->lower,2));
+{	
+	double qMin, qMax;
+	this->limits->getLimits(i,&qMin,&qMax);					// Get the limits for the ith joint
+	qMin *= M_PI/180;
+	qMax *= M_PI/180;
+	double range = qMax - qMin;						// Difference between limits
+	double upper = qMax - this->q[i];					// Distance to upper limit
+	double lower = this->q[i] - qMin;					// Distance from lower limit
+	double dpdq = (range*range*(2*this->q[i] - qMax - qMin))
+			/(4*upper*upper*lower*lower);				// Partial derivative of cost function
 	
-	if(dpdq*this->qdot[i] > 0)							// Moving toward a joint limit
+	if(dpdq*this->qdot[i] > 0)						// Moving towards a limit...
 	{
-		this->penalty = pow(this->range[i],2)/(4*this->upper*this->lower);
-		if(this->penalty < 0)
-		{
-			yError() << "Penalty term for joint " << i + 1 << " of the " << this->name << ": " << this->penalty
-			<< " Joint position: " << this->qMin[i] << " " << this->q[i] << " " << this->qMax[i];
-			return 0;							// Something went wrong and the joint is outside its limits?
-		}
-		else	return 1/this->penalty;						// Returns the INVERSE when moving toward a limit
+		double penalty = (range*range)/(4*upper*lower);			// Weighting based on proximity to a joint
+		if(penalty < 0) penalty = 1E10;					// There was a problem; cap it!
+		return 1/penalty; // Note: Returns the INVERSE when moving toward a limit!
 	}
-	else		return 1.0;							// Free movement away from the limits
+	else	return 1.0;							// Free movement away from the limits
 }
 
