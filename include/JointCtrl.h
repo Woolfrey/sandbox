@@ -207,7 +207,7 @@ bool JointCtrl::set_joint_trajectory(yarp::sig::Vector &target)
 			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);				// Optimal time scaling at peak velocity
 			if(dt > endTime) endTime = dt;
 		}
-		endTime;								// Increase it a little bit
+		endTime *= 2.0;								// Increase it a little bit
 		this->trajectory = Quintic(this->q, target, 0.0, endTime);
 		return true;
 	}
