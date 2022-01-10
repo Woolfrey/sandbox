@@ -1,6 +1,6 @@
 #include <Haiku.h>
 
-int main(int arc, char  *argv[])
+int main(int argc, char  *argv[])
 {	
 	haiku();
 	return 0;

@@ -1,5 +1,131 @@
 #ifndef QUINTIC_H_
 #define QUINTIC_H_
+
+#include <iDynTree/Core/Direction.h>
+#include <iDynTree/Core/Rotation.h>
+#include <iDynTree/Core/VectorDynSize.h>
+#include <iostream>
+#include <math.h>
+
+class Quintic
+{
+	public:
+		// Constructors
+		Quintic() {}							// Empty constructor
+		
+		Quintic(const iDynTree::VectorDynSize &startPoint,		// Trajectory for translation
+			const iDynTree::VectorDynSize &endPoint,
+			const double &startTime,
+			const double &endTime);
+			
+		bool get_state(iDynTree::VectorDynSize &pos,			// Get the state for translations
+				iDynTree::VectorDynSize &vel,
+				iDynTree::VectorDynSize &acc,
+				const double &time);
+	
+	private:
+		double a, b, c, d;						// Polynomial coefficients
+		double t1, t2;							// Start time and end time
+		iDynTree::VectorDynSize p1, p2;					// Start point and end point
+		
+};										// Semicolon needed after class declaration
+
+Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
+		const iDynTree::VectorDynSize &endPoint,
+		const double &startTime,
+		const double &endTime)
+		: p1(startPoint)
+		, p2(endPoint)
+		, t1(startTime)
+		, t2(endTime)
+{
+	// Check the input arguments are sound
+	if(startPoint.size() != endPoint.size())
+	{
+		std::cerr << "[ERROR][QUINTIC] Quintic() : Input vectors are not the same length!" << std::endl;
+	}
+	
+	// Check that the start time < end time
+	if(this->t1 > this->t2)
+	{
+		std::cerr 	<< "[ERROR][QUINTIC] Quintic() : Start time " << this->t1 << " is greater than end time "
+				<< this->t2 << "! Swapping the values..." << std::endl;
+		
+		double temp = this->t1;
+		this->t1 = this->t2;
+		this->t2 = temp;
+	}
+	
+	// Compute the coefficients
+	double dt = this->t2 - this->t1;
+	this->a =   6*pow(dt,-5);
+	this->b = -15*pow(dt,-4);
+	this->c =  10*pow(dt,-3);
+}
+
+/******************** Get the desired position, velocity, and acceleration for the given time ****************************************/
+bool Quintic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel, iDynTree::VectorDynSize &acc, const double &time)
+{
+	// Check the inputs are sound
+	if(pos.size() != vel.size() || vel.size() != acc.size())
+	{
+		std::cerr	<< "[ERROR][QUINTIC] get_state() : Input vectors are not of equal length!"
+				<< " pos: " << pos.size() << " vel: " << vel.size() << " acc: " << acc.size() << "." << std::endl;
+			
+		// Remain at the start of the trajectory	
+		pos = this->p1;
+		for(int i = 0; i < vel.size(); i++)
+		{
+			vel[i] = 0.0;
+			acc[i] = 0.0;
+		}
+		
+		return false;
+	}
+	else
+	{
+		// Compute the interpolation coefficients for the given time
+		double s, sd, sdd;
+		if(time < this->t1)
+		{
+			s   = 0.0;
+			sd  = 0.0;
+			sdd = 0.0;
+		}
+		else if(time < this->t2)
+		{
+			double dt = time - this->t1;							// Elapsed time since start
+			s   =    this->a*pow(dt,5) +    this->b*pow(dt,4) +   this->c*pow(dt,3);
+			sd  =  5*this->a*pow(dt,4) +  4*this->b*pow(dt,3) + 3*this->c*pow(dt,2);
+			sdd = 20*this->a*pow(dt,3) + 12*this->b*pow(dt,2) + 6*this->c;
+		}
+		else
+		{
+			s   = 1.0;
+			sd  = 0.0;
+			sdd = 0.0;
+		}
+		
+		// Interpolate the values along the trajectory
+		for(int i = 0; i < pos.size(); i++)
+		{
+			pos[i] = (1 - s)*this->p1[i] + s*p2[i];
+			vel[i] = sd* (this->p2[i] - this->p1[i]);
+			acc[i] = sdd*(this->p2[i] - this->p1[i]);
+		}
+		
+		return true;
+	}
+}
+
+#endif
+
+/*
+
+// Old codes using yarp::sig Libraries
+
+#ifndef QUINTIC_H_
+#define QUINTIC_H_
 #include <math.h>
 #include <yarp/os/LogStream.h>							// yarp::Info() and the like
 #include <yarp/sig/Vector.h>
@@ -48,7 +174,7 @@ class Quintic
 		
 };										// Semicolon needed after a class declaration
 
-/******************** Constructor for position trajectory ****************************************/
+/******************** Constructor for position trajectory ****************************************
 Quintic::Quintic(const yarp::sig::Vector &startPoint,				// Trajectory between two points
 		const yarp::sig::Vector &endPoint,
 		const float &startTime,
@@ -76,7 +202,7 @@ Quintic::Quintic(const yarp::sig::Vector &startPoint,				// Trajectory between t
 	compute_coefficients();
 }
 
-/******************** Constructor for an orientation trajectory ****************************************/
+/******************** Constructor for an orientation trajectory ****************************************
 Quintic::Quintic(const yarp::sig::Matrix &startRotation,
 		const yarp::sig::Matrix &endRotation,
 		const float &startTime,
@@ -117,7 +243,7 @@ Quintic::Quintic(const yarp::sig::Matrix &startRotation,
 	}
 }
 
-/******************** Get the desired position for the given time ****************************************/
+/******************** Get the desired position for the given time ****************************************
 void Quintic::get_state(yarp::sig::Vector &pos,					// Get desired state for position trajectory
 			yarp::sig::Vector &vel,
 			yarp::sig::Vector &acc,
@@ -138,7 +264,7 @@ void Quintic::get_state(yarp::sig::Vector &pos,					// Get desired state for pos
 	acc = this->sdd*(this->p2 - this->p1);
 }
 
-/******************** Get the desired orientation for the given time ****************************************/
+/******************** Get the desired orientation for the given time ****************************************
 void Quintic::get_state(yarp::sig::Matrix &rot,					// Get desired state for orientation trajectory
 		yarp::sig::Vector &vel,
 		yarp::sig::Vector &acc,
@@ -173,7 +299,7 @@ void Quintic::get_state(yarp::sig::Matrix &rot,					// Get desired state for ori
 	}
 }
 
-/******************** Compute the coefficients for the polynomial ********************/
+/******************** Compute the coefficients for the polynomial ********************
 void Quintic::compute_coefficients()
 {
 	float dt = this->t2 - this->t1;						// Total time of trajectory
@@ -182,7 +308,7 @@ void Quintic::compute_coefficients()
 	this->c =  10*pow(dt,-3);
 }
 
-/******************** Compute scalars to interpolate along the trajectory ********************/
+/******************** Compute scalars to interpolate along the trajectory ********************
 void Quintic::compute_scalars(const float &time)
 {
 	if(time < this->t1)							// Not yet started
@@ -207,3 +333,4 @@ void Quintic::compute_scalars(const float &time)
 }
 
 #endif
+*/
