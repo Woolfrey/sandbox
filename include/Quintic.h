@@ -21,7 +21,7 @@ class Quintic
 				const double &time);
 	
 	private:
-		bool isNotValid = true;							// Will not do any computations if there is a problem
+		bool isNotValid = false;						// Will not do any computations if there is a problem
 		double a, b, c;								// Polynomial coefficients
 		double t1, t2;								// Start time and end time for the trajectory
 		iDynTree::VectorDynSize p1, p2;						// Start point and end point
@@ -43,7 +43,7 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 	// Check the times are in order
 	if(this->t1 > this->t2)
 	{
-		std::cerr 	<< "[ERROR][QUINTIC] Constructor : Start time of "
+		std::cerr 	<< "[WARNING][QUINTIC] Constructor : Start time of "
 				<< this->t1 << " is greater than end time of " << this->t2
 				<< ". Swapping the values..." << std::endl;
 				
@@ -65,25 +65,13 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 		this->a =  6*pow(dt,-5);
 		this->b =-15*pow(dt,-4);
 		this->c = 10*pow(dt,-3);
-		
-		this->isNotValid = false;
 	}	
 }
 
 /******************** Return the desired state for the given time ********************/
 bool Quintic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel, iDynTree::VectorDynSize &acc, const double &time)
 {
-
-	if(this->isNotValid)
-	{
-		std::cerr 	<< "[ERROR][QUINTIC] get_state() : Could not obtain the desired state from this object. "
-				<< "Check that it was constructed correctly." << std::endl;
-				
-		pos = this->p1;									// Remain at the start
-		vel.zero(); acc.zero();								// Don't move
-		return false;
-	}
-	else if(pos.size() != vel.size() || vel.size() != acc.size())
+	if(pos.size() != vel.size() || vel.size() != acc.size())
 	{
 		std::cerr	<< "[ERROR][QUINTIC] get_state() : Input vectors are not of equal length!"
 				<< " pos: " << pos.size() << " vel: " << vel.size() << " acc: " << acc.size() << std::endl;
@@ -92,16 +80,24 @@ bool Quintic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &v
 		acc.resize(this->m); acc.zero();
 		return false;
 	}
-	else if(time < this->t1)
+	else if(this->isNotValid)
 	{
+		std::cerr 	<< "[ERROR][QUINTIC] get_state() : Could not obtain the desired state from this object. "
+				<< "Check that it was constructed correctly." << std::endl;
+				
 		pos = this->p1;									// Remain at the start
 		vel.zero(); acc.zero();								// Don't move
-		return true;
+		return false;
 	}
-	else if(time < this->t2)
+	else
 	{
+		// Determine the elapsed time
+		double dt;
+		if(time < this->t1) 		dt = 0.0;					// Remain at start
+		else if(time < this->t2) 	dt = time - this->t1;				// Somewhere in the middle
+		else				dt = this->t2 - this->t1;			// Remain at end
+		
 		// Compute the coefficients for interpolating along the trajectory
-		double dt = time - this->t2;							// Elapsed time
 		double s =  	this->a*pow(dt,5) +    this->b*pow(dt,4) +   this->c*pow(dt,3);
 		double sd =   5*this->a*pow(dt,4) +  4*this->b*pow(dt,3) + 3*this->c*pow(dt,2);
 		double sdd = 20*this->a*pow(dt,3) + 12*this->b*pow(dt,2) + 6*this->c*dt;
@@ -113,12 +109,6 @@ bool Quintic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &v
 			vel[i] =  sd*(this->p2[i] - this->p1[i]);
 			acc[i] = sdd*(this->p2[i] - this->p1[i]);
 		}
-		return true;
-	}
-	else
-	{
-		pos = this->p2;									// Remain at the end
-		vel.zero(); acc.zero();								// Don't move
 		return true;
 	}
 }
