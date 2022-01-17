@@ -1,3 +1,7 @@
+/*
+*	A minimum jerk trajectory between two points in space.
+*/
+
 #ifndef QUINTIC_H_
 #define QUINTIC_H_
 
@@ -43,9 +47,8 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 	// Check the times are in order
 	if(this->t1 > this->t2)
 	{
-		std::cerr 	<< "[WARNING][QUINTIC] Constructor : Start time of "
-				<< this->t1 << " is greater than end time of " << this->t2
-				<< ". Swapping the values..." << std::endl;
+		std::cerr << "[WARNING][QUINTIC] Constructor : Start time of " << this->t1 << " is greater than end time of " << this->t2
+			<< ". Swapping the values..." << std::endl;
 				
 		double temp = this->t1;
 		this->t1 = this->t2;
@@ -53,9 +56,9 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 	}
 	if(startPoint.size() != endPoint.size())
 	{
-		std::cerr 	<< "[ERROR][QUINTIC] Constructor : Input vectors are not of equal length!"
-				<< " Start point has " << startPoint.size() << " elements and end point has "
-				<< endPoint.size() << " elements." << std::endl;
+		std::cerr  << "[ERROR][QUINTIC] Constructor : Input vectors are not of equal length!"
+			<< " Start point has " << startPoint.size() << " elements and end point has "
+			<< endPoint.size() << " elements." << std::endl;
 		this->isNotValid = true;
 	}
 	else
