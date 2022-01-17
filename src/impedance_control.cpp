@@ -1,7 +1,7 @@
-#include <CartesianTraj.h>
-#include <CubicRot.h>
+#include <CartesianTrajectory.h>
+#include <CubicRotation.h>
 #include <Haiku.h>
-#include <QuinticRot.h>
+#include <QuinticRotation.h>
 
 int main(int argc, char *argv[])
 {
