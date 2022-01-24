@@ -88,7 +88,7 @@ bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
 	}
 	else
 	{
-		std::cerr << "[ERROR][CartesianTrajectory] get_state() : Could not the desired state." << std::endl;
+		std::cerr << "[ERROR] [CARTESIANTRAJECTORY] get_state() : Could not the desired state." << std::endl;
 		
 		pose = this->T0;								// Remain at the start
 		linearVel.zero(); angularVel.zero(); linearAcc.zero(); angularAcc.zero();	// Don't move
