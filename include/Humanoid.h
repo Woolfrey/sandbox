@@ -17,7 +17,9 @@ class Humanoid : public yarp::os::PeriodicThread
 		Humanoid(const std::string &fileName);				// Constructor
 		
 		void close();							// Closes the device drivers for all the limbs
-	
+		
+		bool update_state();
+		
 	private:
 		bool isValid = true;						// Will not do computations if true
 		int dofs;							// Degrees of freedom
@@ -26,9 +28,9 @@ class Humanoid : public yarp::os::PeriodicThread
 		JointController leftArm, rightArm, leftLeg, rightLeg, torso;	// Communicates with all the limbs
 		
 		// Control loop stuff
-///		bool threadInit() {return true;}
-//		void run();
-//		void threadRelease();
+		bool threadInit() {return true;}
+		void run() {}
+		void threadRelease() {}
 };										// Semicolon needed after a class declaration
 
 /******************** Constructor *********************/
@@ -38,31 +40,34 @@ Humanoid::Humanoid(const std::string &fileName) : yarp::os::PeriodicThread(0.01)
 	iDynTree::ModelLoader loader;						// Temporary
 	if(!loader.loadModelFromFile(fileName))					// Try to load the model
 	{
-		std::cerr << "[ERROR][HUMANOID] Constructor : Could not load model from the path: " << fileName << std::endl;
-		this->isValid *= true;
+		std::cerr << "[ERROR] [HUMANOID] Constructor : Could not load model from the path: " << fileName << std::endl;
+		this->isValid &= false;
 	}
 	else									// Successful, now move on to creating the model
 	{
 		if(!this->computer.loadRobotModel(loader.model()))
 		{
-			std::cerr << "[ERROR][HUMANOID] Constructor : Could not generate KinDynComputations class from given model." << std::endl;
-			std::cerr << loader.model().toString() << std::endl;
+			std::cerr << "[ERROR] [HUMANOID] Constructor : Could not generate KinDynComputations class from given model. "
+				<< loader.model().toString() << std::endl;
+			this->isValid &= false;
 		}
 		else
 		{
 			this->model = computer.model();				// This stores basic kinematic & dynamic properties
 			this->dofs = model.getNrOfDOFs();			// Get the number of joints
+			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
+			
+			// Configure the device drivers for the different body parts
+			this->isValid &= this->leftArm.configure_drivers("/local/left_arm", "/icubSim/left_arm", "left arm", 7);
+			this->isValid &= this->leftLeg.configure_drivers("/local/left_leg", "/icubSim/left_leg", "left leg", 7);
+			this->isValid &= this->rightArm.configure_drivers("/local/right_arm", "/icubSim/right_arm", "right arm", 6);
+			this->isValid &= this->rightLeg.configure_drivers("/local/right_leg", "/icubSim/right_leg", "right leg", 6);
+			this->isValid &= this->torso.configure_drivers("/local/torso", "/icubSim/torso", "torso", 3);
 		}
 	}
-
-	// Configure the device drivers for the different body parts
-	this->isValid &= this->leftArm.configure_drivers("/local/left_arm", "/icubSim/left_arm", "left arm", 7);
-	this->isValid &= this->leftLeg.configure_drivers("/local/left_leg", "/icubSim/left_leg", "left leg", 7);
-	this->isValid &= this->rightArm.configure_drivers("/local/right_arm", "/icubSim/right_arm", "right arm", 6);
-	this->isValid &= this->rightLeg.configure_drivers("/local/right_leg", "/icubSim/right_leg", "right leg", 6);
-	this->isValid &= this->torso.configure_drivers("/local/torso", "icubSim/torso", "torso", 3);
 }
 
+/******************** Close the device drivers on the robot ********************/
 void Humanoid::close()
 {
 	this->leftArm.close();
@@ -70,6 +75,12 @@ void Humanoid::close()
 	this->rightArm.close();
 	this->rightLeg.close();
 	this->torso.close();
+}
+
+/******************** Update the joint state for all the limbs ********************/
+bool Humanoid::update_state()
+{
+	return true;
 }
 
 /*
