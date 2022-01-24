@@ -99,7 +99,7 @@ bool QuinticRotation::get_state(iDynTree::Rotation &rot,
 	}
 	else
 	{
-		std::cerr << "[ERROR][QUINTICROTATION] get_state() : Could not obtain the state for the given time." << std::endl;
+		std::cerr << "[ERROR] [QUINTICROTATION] get_state() : Could not obtain the state for the given time." << std::endl;
 		rot = this->R0;
 		for(int i = 0; i < 3; i++)
 		{

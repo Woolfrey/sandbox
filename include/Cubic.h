@@ -41,7 +41,7 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points, const std::vect
 	// Check that the input dimensions are sound
 	if(points.size() != times.size())
 	{
-		std::cerr << "[ERROR][CUBIC] Constructor : Inputs are not of equal length!"
+		std::cerr << "[ERROR] [CUBIC] Constructor : Inputs are not of equal length!"
 			<< " points: " << points.size() << " times: " << times.size() << std::endl;
 		this->isNotValid = true;
 	}
@@ -54,7 +54,7 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points, const std::vect
 		{
 			if(times[i] > times[i+1])
 			{
-				std::cerr << "[ERROR][CUBIC] Constructor : Times are not in ascending order!" << std::endl;
+				std::cerr << "[ERROR] [CUBIC] Constructor : Times are not in ascending order!" << std::endl;
 				this->isNotValid = true;
 			}
 		}
@@ -148,7 +148,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 	// Check that the input arguments are the same length
 	if(pos.size() != vel.size() || vel.size() != acc.size())
 	{
-		std::cerr << "[ERROR][CUBIC] get_state() : Vectors are not of equal length!"
+		std::cerr << "[ERROR] [CUBIC] get_state() : Vectors are not of equal length!"
 			<< " pos: " << pos.size() << " vel: " << vel.size() << " acc: " << acc.size() << std::endl;
 		
 		pos.resize(this->m); vel.resize(this->m); acc.resize(this->m);
@@ -163,7 +163,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 	// Check if the object is valid upon construction
 	else if(this->isNotValid)								// Something wrong with this object
 	{
-		std::cerr << "[ERROR][CUBIC] get_state() : Something went wrong during construction of this object. "
+		std::cerr << "[ERROR] [CUBIC] get_state() : Something went wrong during construction of this object. "
 			<< "Cannot return the state." << std::endl;
 				
 		for(int i = 0; i < this->m; i++)

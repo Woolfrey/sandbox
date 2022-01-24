@@ -68,19 +68,19 @@ bool JointController::configure_drivers(const std::string &localPortName,
 	this->driver.open(options);
 	if(!this->driver.isValid())
 	{
-		std::cerr << "[ERROR][JOINTCONTROLLER] Unable to configure the device driver for " << this->name << "." << std::endl;
+		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the device driver for " << this->name << "." << std::endl;
 		this->isConfigured *= false;
 	}
 	
 	// Try and configure the joint controllers
 	if(!this->driver.view(this->controller))
 	{
-		std::cerr << "[ERROR][JOINTCONTROLLER] Unable to configure the controller for " << this->name << "." << std::endl;
+		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the controller for " << this->name << "." << std::endl;
 		this->isConfigured *= false;
 	}
 	else if(!this->driver.view(this->mode))
 	{
-		std::cerr << "[ERROR][JOINTCONTROLLER] Unable to configure the control mode for " << this->name << "." << std::endl;
+		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the control mode for " << this->name << "." << std::endl;
 		this->isConfigured *= false;
 	}
 	else
@@ -97,7 +97,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 	// Now try and obtain the joint limits
 	if(!this->driver.view(this->limits))
 	{
-		std::cerr << "[ERROR][JOINTCONTROLLER] Unable to obtain joint limits for " << this->name << "." << std::endl;
+		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to obtain joint limits for " << this->name << "." << std::endl;
 		this->isConfigured *= false;
 	}
 	else
@@ -118,7 +118,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 	// Finally, configure the encoders
 	if(!this->driver.view(this->encoders))
 	{
-		std::cerr << "[ERROR][JOINTCONTROLLER] Unable to configure the encoders for " << this->name << "." << std::endl;
+		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the encoders for " << this->name << "." << std::endl;
 		this->isConfigured *= false;
 	}
 	else
@@ -131,7 +131,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 			
 			if(i == 5)
 			{
-				std::cerr << "[ERROR][JOINTCONTROLLER] Could not obtain encoder values for "
+				std::cerr << "[ERROR] [JOINTCONTROLLER] Could not obtain encoder values for "
 					<< this->name << " in 5 attempts." << std::endl;
 				
 				this->isConfigured *= false;
@@ -142,7 +142,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 		for(int i = 0; i < this->n; i++) this->q[i] = temp[i]*M_PI/180;
 	}	
 	
-	if(this->isConfigured) std::cout << "[INFO][JOINTCONTROLLER] Successfully configured the drivers for " << this->name << "." << std::endl;
+	if(this->isConfigured) std::cout << "[INFO] [JOINTCONTROLLER] Successfully configured the drivers for " << this->name << "." << std::endl;
 	else this->driver.close();
 	
 	return this->isConfigured;
@@ -165,7 +165,7 @@ bool JointController::read_encoders()
 		if(this->q[i] < this->qMin[i]) this->q[i] = this->qMin[i];
 	}
 
-	if(!success) std::cerr << "[ERROR][JOINTCONTROLLER] Could not obtain new encoder values for " << this->name << "." << std::endl;
+	if(!success) std::cerr << "[ERROR] [JOINTCONTROLLER] Could not obtain new encoder values for " << this->name << "." << std::endl;
 	
 	return success;
 }

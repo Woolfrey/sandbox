@@ -36,7 +36,7 @@ CubicRotation::CubicRotation(const std::vector<iDynTree::Rotation> &rots, const 
 	
 	if(rots.size() != times.size())
 	{
-		std::cerr << "[ERROR][CUBICROTATION] Constructor : Input vectors are not of equal length." << std::endl;
+		std::cerr << "[ERROR] [CUBICROTATION] Constructor : Input vectors are not of equal length." << std::endl;
 		std::cerr << "rots: " << rots.size() << " times " << times.size() << std::endl;
 	}
 	else
@@ -47,7 +47,7 @@ CubicRotation::CubicRotation(const std::vector<iDynTree::Rotation> &rots, const 
 		{
 			if(times[i] > times[i+1])
 			{
-				std::cerr << "[ERROR][CUBICROTATION] Constructor : Times are not in ascending order." << std::endl;
+				std::cerr << "[ERROR] [CUBICROTATION] Constructor : Times are not in ascending order." << std::endl;
 				this->isNotValid = false;
 				break;
 			}
@@ -216,7 +216,7 @@ bool CubicRotation::get_state(iDynTree::Rotation &rot,
 	// Failed, so don't move
 	else
 	{
-		std::cerr << "[ERROR][CUBICROTATION] get_state() : Could not obtain the desired state." << std::endl;
+		std::cerr << "[ERROR] [CUBICROTATION] get_state() : Could not obtain the desired state." << std::endl;
 		
 		rot = this->R[0];						// Remain at the start
 		vel.zero(); acc.zero();						// Don't move
