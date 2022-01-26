@@ -22,16 +22,20 @@ class JointController
 					const std::string &_name,
 					const int &numberOfJoints);
 					
+		bool read_encoders();			
+		
+		iDynTree::VectorDynSize get_joint_positions() const {return this->q;} 	// As it says on the label
+		iDynTree::VectorDynSize get_joint_velocities() const {return this->qdot;} // As it says on the label
+		
 		void close() {this->driver.close();}					// Close the driver(s)
 		
-		// Control functions
-		bool read_encoders();
 		
 	private:
 		bool isConfigured = true;						// Won't do anything is this is false
+		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
 		int n;									// Number of joints
 		std::string name;							// For identification purposes
-		std::vector<double> q, qdot, qMin, qMax, vLim;				// Joint positions & velocities
+//		std::vector<double> q, qdot, qMin, qMax, vLim;				// Joint positions & velocities
 		
 	   	// These interface with the hardware
     		yarp::dev::IControlLimits*	limits;					// Joint limits?
@@ -69,19 +73,19 @@ bool JointController::configure_drivers(const std::string &localPortName,
 	if(!this->driver.isValid())
 	{
 		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the device driver for " << this->name << "." << std::endl;
-		this->isConfigured *= false;
+		this->isConfigured = false;
 	}
 	
 	// Try and configure the joint controllers
 	if(!this->driver.view(this->controller))
 	{
 		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the controller for " << this->name << "." << std::endl;
-		this->isConfigured *= false;
+		this->isConfigured = false;
 	}
 	else if(!this->driver.view(this->mode))
 	{
 		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to configure the control mode for " << this->name << "." << std::endl;
-		this->isConfigured *= false;
+		this->isConfigured = false;
 	}
 	else
 	{
@@ -98,7 +102,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 	if(!this->driver.view(this->limits))
 	{
 		std::cerr << "[ERROR] [JOINTCONTROLLER] Unable to obtain joint limits for " << this->name << "." << std::endl;
-		this->isConfigured *= false;
+		this->isConfigured = false;
 	}
 	else
 	{
@@ -134,7 +138,7 @@ bool JointController::configure_drivers(const std::string &localPortName,
 				std::cerr << "[ERROR] [JOINTCONTROLLER] Could not obtain encoder values for "
 					<< this->name << " in 5 attempts." << std::endl;
 				
-				this->isConfigured *= false;
+				this->isConfigured = false;
 			}
 			yarp::os::Time::delay(0.05);
 		}
