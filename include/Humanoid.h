@@ -10,46 +10,9 @@
 	bool OK = computer.getFreeFloatingMassMatrix(iDynTree::make_matrix_view(M);
 */
 
-/* Joint List:
-
-// Left arm
-"l_shoulder_pitch";
-"l_shoulder_roll";
-"l_shoulder_yaw";
-"l_elbow";
-
-// Right Arm
-"r_shoulder_pitch";
-"r_shoulder_roll";
-"r_shoulder_yaw";
-"r_elbow";
-
-// Left Leg
-"l_hip_pitch";
-"l_hip_roll";
-"l_hip_yaw";
-"l_knee";
-"l_ankle_pitch";
-"l_ankle_roll";
-
-// Right Leg
-"r_hip_pitch";
-"r_hip_roll";
-"r_hip_yaw";
-"r_knee";
-"r_ankle_pitch";
-"r_ankle_roll";
-
-// Torso
-"torso_pitch";
-"torso_roll";
-"torso_yaw";
 
 // Head
-"neck_pitch";
-"neck_roll";
-"neck_yaw";
-"neck_fixed_joint";
+;
 
 // Sensors
 r_leg_ft_sensor
@@ -60,10 +23,6 @@ r_arm_ft_sensor
 l_leg_ft_sensor
 l_foot_front_ft_sensor
 l_foot_rear_ft_sensor
-
-
-
-
 */
 
 #ifndef HUMANOID_H_
@@ -76,11 +35,44 @@ l_foot_rear_ft_sensor
 #include <JointController.h>							// Interfaces with motors on the robot
 #include <yarp/os/PeriodicThread.h>						// Keeps timing of the control loop
 
+std::vector<std::string> jointList = {	// Torso
+					  "torso_pitch"
+					, "torso_roll"
+					, "torso_yaw"
+					// Left Arm
+					, "l_shoulder_pitch"
+					, "l_shoulder_roll"
+					, "l_shoulder_yaw"
+					, "l_elbow"
+					// Right Arm
+					, "r_shoulder_pitch"
+					, "r_shoulder_roll"
+					, "r_shoulder_yaw"
+					, "r_elbow"
+					// Left Leg
+					, "l_hip_pitch"
+					, "l_hip_roll"
+					, "l_hip_yaw"
+					, "l_knee"
+					, "l_ankle_pitch"
+					, "l_ankle_roll"
+					// Right Leg
+					, "r_hip_pitch"
+					, "r_hip_roll"
+					, "r_hip_yaw"
+					, "r_knee"
+					, "r_ankle_pitch"
+					, "r_ankle_roll"
+					// Neck
+					, "neck_pitch"
+					, "neck_roll"
+					, "neck_yaw"
+					, "neck_fixed_joint"};
+
 class Humanoid : public yarp::os::PeriodicThread
 {
 	public:
 		Humanoid(const std::string &fileName);				// Constructor
-		void close();							// Closes the device drivers for all the limbs
 		
 		bool update_state();
 		
@@ -89,7 +81,6 @@ class Humanoid : public yarp::os::PeriodicThread
 		int dofs;							// Degrees of freedom
 		iDynTree::KinDynComputations computer;				// Does all the kinematics & dynamics
 		iDynTree::Model model;						// I don't know what this does
-		JointController leftArm, rightArm, leftLeg, rightLeg, torso;	// Communicates with the joints on all the limbs
 		
 		// Control loop stuff
 		bool threadInit() {return true;}
@@ -124,18 +115,11 @@ Humanoid::Humanoid(const std::string &fileName) : yarp::os::PeriodicThread(0.01)
 			this->dofs = model.getNrOfDOFs();			// Get the number of joints
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 			
-			// Configure the device drivers for the different body parts
-			this->isValid &= this->leftArm.configure_drivers("/local/left_arm", "/icubSim/left_arm", "left arm", 7);
-			this->isValid &= this->leftLeg.configure_drivers("/local/left_leg", "/icubSim/left_leg", "left leg", 7);
-			this->isValid &= this->rightArm.configure_drivers("/local/right_arm", "/icubSim/right_arm", "right arm", 6);
-			this->isValid &= this->rightLeg.configure_drivers("/local/right_leg", "/icubSim/right_leg", "right leg", 6);
-			this->isValid &= this->torso.configure_drivers("/local/torso", "/icubSim/torso", "torso", 3);
-			
-			// Test the Kinematics
-			if(this->isValid && update_state())
-			{
+//			// Test the Kinematics
+//			if(this->isValid && update_state())
+//			{
 				// Print out all the link and joint names
-				std::cout << "\nHere are the links:" << std::endl;
+/*				std::cout << "\nHere are the links:" << std::endl;
 				for(int i = 0; i < model.getNrOfLinks(); i++)
 				{
 					std::cout << this->model.getLinkName(i) << std::endl;
@@ -160,37 +144,19 @@ Humanoid::Humanoid(const std::string &fileName) : yarp::os::PeriodicThread(0.01)
 					std::cout << J << std::endl;
 				}
 				else	std::cerr << "[ERROR] [HUMANOID] Could not obtain the Jacobian for the left hand." << std::endl;
-			}
-			else
-			{
-				std::cout << "[INFO] [HUMANOID] Something went wrong. Cannot compute kinematics & dynamics." << std::endl;
-			}	
+//			}
+//			else
+//			{
+//				std::cout << "[INFO] [HUMANOID] Something went wrong. Cannot compute kinematics & dynamics." << std::endl;
+//			}*/	
 		}
 	}
 }
 
-/******************** Close the device drivers on the robot ********************/
-void Humanoid::close()
-{
-	this->leftArm.close();
-	this->leftLeg.close();
-	this->rightArm.close();
-	this->rightLeg.close();
-	this->torso.close();
-}
 
 /******************** Update the joint state for all the limbs ********************/
 bool Humanoid::update_state()
 {
-	bool success = true;
-	
-	// Read the encoders on all the limbs
-	success &= this->leftArm.read_encoders();
-	success &= this->rightArm.read_encoders();
-	success &= this->leftLeg.read_encoders();
-	success &= this->rightLeg.read_encoders();
-	success &= this->torso.read_encoders();
-	
 	// Compile the joint state vectors
 	
 	// iDynTree::Transform P;						// Base pose
@@ -201,7 +167,7 @@ bool Humanoid::update_state()
 	
 	// computer.setRobotState(P, q, v, qdot, g);
 	
-	return success;
+	return true;
 }
 
 #endif

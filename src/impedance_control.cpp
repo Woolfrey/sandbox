@@ -22,8 +22,6 @@ int main(int argc, char *argv[])
 
 		std::cout << "[INFO] [IMPEDANCECONTROL] All done." << std::endl;
 		
-		robot.close();
-		
 		return 0;								// No problems with main
 	}
 }
