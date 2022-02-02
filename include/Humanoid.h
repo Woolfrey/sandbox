@@ -2,29 +2,6 @@
 *	Robot control class using iDynTree.
 */
 
-/*
-	Eigen::MatrixXd J(6,this->n+6);
-	bool OK = computer.getFrameFreeFloatingJacobian(frameIndex, iDynTree::make_matrix:view(J));
-
-	Eigen::MatrixXd M(6+this->n, 6+this->n);
-	bool OK = computer.getFreeFloatingMassMatrix(iDynTree::make_matrix_view(M);
-*/
-
-
-// Head
-;
-
-// Sensors
-r_leg_ft_sensor
-r_foot_rear_ft_sensor
-r_foot_front_ft_sensor
-l_arm_ft_sensor
-r_arm_ft_sensor
-l_leg_ft_sensor
-l_foot_front_ft_sensor
-l_foot_rear_ft_sensor
-*/
-
 #ifndef HUMANOID_H_
 #define HUMANOID_H_
 
@@ -32,7 +9,7 @@ l_foot_rear_ft_sensor
 #include <iDynTree/KinDynComputations.h>					// Class that does inverse dynamics calculations
 #include <iDynTree/Model/Model.h>						// Class that holds basic kinematic & dynamic info
 #include <iDynTree/ModelIO/ModelLoader.h>					// Extracts information from URDF
-#include <JointController.h>							// Interfaces with motors on the robot
+#include <JointInterface.h>							// Interfaces with motors on the robot
 #include <yarp/os/PeriodicThread.h>						// Keeps timing of the control loop
 
 std::vector<std::string> jointList = {	// Torso
@@ -62,112 +39,193 @@ std::vector<std::string> jointList = {	// Torso
 					, "r_hip_yaw"
 					, "r_knee"
 					, "r_ankle_pitch"
-					, "r_ankle_roll"
+					, "r_ankle_roll"};
 					// Neck
-					, "neck_pitch"
-					, "neck_roll"
-					, "neck_yaw"
-					, "neck_fixed_joint"};
+//					, "neck_pitch"
+//					, "neck_roll"
+//					, "neck_yaw"};
+					//, "neck_fixed_joint"};
 
-class Humanoid : public yarp::os::PeriodicThread
+class Humanoid	: public yarp::os::PeriodicThread
+		, public JointInterface
 {
 	public:
 		Humanoid(const std::string &fileName);				// Constructor
 		
-		bool update_state();
+		bool update_state();	
+		bool move_to_position(const iDynTree::VectorDynSize &position);
+		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);
+		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
 		
 	private:
 		bool isValid = true;						// Will not do computations if true
-		int dofs;							// Degrees of freedom
+		double startTime;
+		int n;								// Degrees of freedom
 		iDynTree::KinDynComputations computer;				// Does all the kinematics & dynamics
 		iDynTree::Model model;						// I don't know what this does
+		iDynTree::Transform torsoPose;
+		iDynTree::Twist torsoTwist;
+		iDynTree::Vector3 gravity;
 		
 		// Control loop stuff
-		bool threadInit() {return true;}
-		void run() {}
-		void threadRelease() {}
+		bool threadInit();
+		void run();
+		void threadRelease();
+		
+		void print_kinematics();
 };										// Semicolon needed after a class declaration
 
 /******************** Constructor *********************/
-Humanoid::Humanoid(const std::string &fileName) : yarp::os::PeriodicThread(0.01)
+Humanoid::Humanoid(const std::string &fileName)
+	: yarp::os::PeriodicThread(0.01)
+	, JointInterface(jointList)
+	, torsoPose(iDynTree::Transform::Identity())
+	, torsoTwist(iDynTree::Twist(iDynTree::GeomVector3(0,0,0), iDynTree::GeomVector3(0,0,0)))
 {
+	// Set the gravity vector
+	this->gravity(0) = 0.0;
+	this->gravity(1) = 0.0;
+	this->gravity(2) =-9.81;
+	
 	// Load a model
 	iDynTree::ModelLoader loader;						// Temporary
-	
-	//loader.loadReducedFromFile(fileName, std::vector<std::string> jointList, const std::string filtype = "");
-	
-	if(!loader.loadModelFromFile(fileName))					// Try to load the model
+
+//	if(!loader.loadModelFromFile(fileName))
+	if(!loader.loadReducedModelFromFile(fileName, jointList, "urdf"))
 	{
-		std::cerr << "[ERROR] [HUMANOID] Constructor : Could not load model from the path: " << fileName << std::endl;
-		this->isValid &= false;
+		std::cerr << "[ERROR] [HUMANOID] Constructor: Could not load model from path " << fileName << std::endl;
+		this->isValid = false;
 	}
-	else									// Successful, now move on to creating the model
+	else
 	{
 		if(!this->computer.loadRobotModel(loader.model()))
 		{
-			std::cerr << "[ERROR] [HUMANOID] Constructor : Could not generate KinDynComputations class from given model. "
+			std::cerr << "[ERROR] [HUMANOID] Constructor : Could not generate iDynTree::KinDynComputations class from given model: "
 				<< loader.model().toString() << std::endl;
-			this->isValid &= false;
 		}
 		else
 		{
-			this->model = computer.model();				// This stores basic kinematic & dynamic properties
-			this->dofs = model.getNrOfDOFs();			// Get the number of joints
+			this->model = computer.model();
+			this->n = model.getNrOfDOFs();
+			
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
-			
-//			// Test the Kinematics
-//			if(this->isValid && update_state())
-//			{
-				// Print out all the link and joint names
-/*				std::cout << "\nHere are the links:" << std::endl;
-				for(int i = 0; i < model.getNrOfLinks(); i++)
-				{
-					std::cout << this->model.getLinkName(i) << std::endl;
-				}
-				
-				std::cout << "\nHere are the joints:" << std::endl;
-				for(int i = 0; i < model.getNrOfJoints(); i++)
-				{
-					std::cout << this->model.getJointName(i) << std::endl;
-				}
-				
-				// Print out the pose of the left hand
-				iDynTree::Transform T = this->computer.getWorldTransform("l_hand");
-				std::cout << "\n[INFO] [HUMANOID] Here is the pose of the left hand:" << std::endl;
-				std::cout << T.toString() << std::endl;
-			
-				// Print out the Jacobian for the left hand
-				Eigen::MatrixXd J(6, this->dofs + 6);
-				if(this->computer.getFrameFreeFloatingJacobian("l_hand", J))
-				{
-					std::cout << "\n[INFO] [HUMANOID] Here is the Jacobian to the left hand:" << std::endl;
-					std::cout << J << std::endl;
-				}
-				else	std::cerr << "[ERROR] [HUMANOID] Could not obtain the Jacobian for the left hand." << std::endl;
-//			}
-//			else
-//			{
-//				std::cout << "[INFO] [HUMANOID] Something went wrong. Cannot compute kinematics & dynamics." << std::endl;
-//			}*/	
+	
+			// print_kinematics()
 		}
 	}
 }
 
-
 /******************** Update the joint state for all the limbs ********************/
 bool Humanoid::update_state()
 {
-	// Compile the joint state vectors
-	
-	// iDynTree::Transform P;						// Base pose
-	// iDynTree::VectorDynSize q;						// Joint positions
-	// iDynTree::Twist v;							// Base velocity
-	// iDynTree::VectorDynSize qdot;					// Joint velocities
-	// iDynTree::Vector3 g;							// Gravitational acceleration
-	
-	// computer.setRobotState(P, q, v, qdot, g);
-	
+	if(JointInterface::read_encoders())
+	{
+		if(this->computer.setRobotState(this->torsoPose, this->q, this->torsoTwist, this->qdot, this->gravity))
+		{
+			return true;
+		}
+		else
+		{
+			std::cerr << "[ERROR] [HUMANOID] update_state() : Could not set state for the iDynTree::iKinDynComputations object." << std::endl;
+			return false;
+		}
+	}
+	else
+	{
+		std::cerr << "[ERROR] [HUMANOID] update_state() : Could not update state from the JointInterface class." << std::endl;
+		return false;
+	}
+}
+
+/******************** Move the joints to a desired position ********************/
+bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
+{
+	if(position.size() > this->n)
+	{
+		std::cerr << "[ERROR] [HUMANOID] move_to_position() : Input vector has " << position.size() 
+			<< " elements, but there are only " << this->n << " joints in this model." << std::endl;
+		return false;
+	}
+	else
+	{
+		iDynTree::VectorDynSize desired = this->q;				// Assume we aren't going to move
+		
+		for(int i = 0; i < position.size(); i++) desired[i] = position[i];	// Override given joints
+		
+		// Compute optimal time scaling
+		// this->jointTrajectory = Quintic(desired, actual, time);
+		// start(); // Go immediately to threadInit()
+		
+		return true;
+	}
+}
+
+/******************** This is executed just after start() is called ********************/
+bool Humanoid::threadInit()
+{
+	this->startTime = yarp::os::Time::now();
 	return true;
+	
+	// Go immediately to run()
+}
+
+/******************** MAIN CONTROL LOOP ********************/
+void Humanoid::run()
+{
+	update_state();									// Update the joint state information
+	double elapsedTime = yarp::os::Time::now() - this->startTime;			// Get elapsed time since start
+	
+	// Do stuff
+	
+	// Run this function repeatedly until stop() is called
+}
+
+/******************** This is executed just after stop() is called ********************/
+void Humanoid::threadRelease()
+{
+	// Worker bees can leave.
+	// Even drones can fly away.
+	// The Queen is their slave.
+}
+
+/******************** Prints out stuff for debugging purposes ********************/
+void Humanoid::print_kinematics()
+{		
+	std::cout << "\nHere is the given joint list:" << std::endl;
+	for(int i = 0; i < jointList.size(); i++) std::cout << jointList[i] << std::endl;
+
+	std::cout << "\nHere is the joint list in the model:" << std::endl;
+	for(int i = 0; i < this->n; i++) std::cout << this->model.getJointName(i) << std::endl;
+
+	if(!update_state()) std::cerr << "[ERROR] [HUMANOID] Unable to update state." << std::endl;
+	else
+	{
+		// Print out the pose of the left hand
+		iDynTree::Transform T = this->computer.getWorldTransform("l_hand");
+		std::cout << "\nHere is the pose of the left hand:" << std::endl;
+		std::cout << T.asHomogeneousTransform().toString() << std::endl;
+		
+		// Print out the Jacobian for the left hand
+		Eigen::MatrixXd J(6, this->n + 6);
+		if(this->computer.getFrameFreeFloatingJacobian("l_hand", J))
+		{
+			std::cout << "\nHere is the Jacobian to the left hand:" << std::endl;
+			std::cout << J << std::endl;
+		}
+		else std::cerr << "[ERROR] [HUMANOID] Something went wrong. Cannot compute kinematics & dynamics." << std::endl;
+		
+		T = this->computer.getWorldTransform("r_hand");
+		std::cout << "\nHere is the pose of the right hand:" << std::endl;
+		std::cout << T.asHomogeneousTransform().toString() << std::endl;
+		
+		// Print out the Jacobian for the right hand:
+		if(this->computer.getFrameFreeFloatingJacobian("r_hand", J))
+		{
+			std::cout << "\nHere is the Jacobian to the right hand:" << std::endl;
+			std::cout << J << std::endl;
+		}
+		else std::cerr << "[ERROR] [HUMANOID] Something went wrong. Cannot compute the kinematics & dynamics." << std::endl;
+	}
 }
 
 #endif
