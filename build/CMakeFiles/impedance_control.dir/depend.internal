@@ -37,8 +37,10 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Wrench.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/KinDynComputations.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/FreeFloatingMatrices.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/FreeFloatingState.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/IJoint.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/Indices.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/JointState.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/Link.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/LinkState.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/Model.h

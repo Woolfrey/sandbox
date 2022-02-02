@@ -51,6 +51,8 @@ Eigen/Core
 -
 iDynTree/KinDynComputations.h
 -
+iDynTree/Model/FreeFloatingState.h
+-
 iDynTree/Model/Model.h
 -
 iDynTree/ModelIO/ModelLoader.h
@@ -316,6 +318,22 @@ iDynTree/Model/LinkState.h
 iDynTree/Core/MatrixDynSize.h
 -
 
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/FreeFloatingState.h
+iDynTree/Core/Transform.h
+-
+iDynTree/Core/Twist.h
+-
+iDynTree/Core/VectorDynSize.h
+-
+iDynTree/Model/Indices.h
+-
+iDynTree/Model/LinkState.h
+-
+iDynTree/Model/JointState.h
+-
+vector
+-
+
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/IJoint.h
 iDynTree/Model/Indices.h
 -
@@ -327,6 +345,16 @@ string
 -
 ModelExport.h
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/ModelExport.h
+
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/JointState.h
+iDynTree/Core/VectorFixSize.h
+-
+iDynTree/Core/VectorDynSize.h
+-
+iDynTree/Core/SpatialForceVector.h
+-
+vector
+-
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Model/Link.h
 iDynTree/Core/SpatialInertia.h
