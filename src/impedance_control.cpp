@@ -2,7 +2,6 @@
 #include <CubicRotation.h>								// Custom trajectory class
 #include <Haiku.h>									// A simple poem in the form of a haiku
 #include <Humanoid.h>									// Custom robot control class
-#include <JointController.h>								// Custom class for communicating with robot
 #include <QuinticRotation.h>								// Custom trajectory class
 
 int main(int argc, char *argv[])
