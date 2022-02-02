@@ -7,6 +7,7 @@
 
 #include <Eigen/Core>								// Eigen::MatrixXd
 #include <iDynTree/KinDynComputations.h>					// Class that does inverse dynamics calculations
+#include <iDynTree/Model/FreeFloatingState.h>					// iDynTree::FreeFloatingGeneralizedTorques
 #include <iDynTree/Model/Model.h>						// Class that holds basic kinematic & dynamic info
 #include <iDynTree/ModelIO/ModelLoader.h>					// Extracts information from URDF
 #include <JointInterface.h>							// Interfaces with motors on the robot
@@ -59,13 +60,18 @@ class Humanoid	: public yarp::os::PeriodicThread
 		
 	private:
 		bool isValid = true;						// Will not do computations if true
+		double Kq = 50; 
+		double Kd = 2*sqrt(Kq);
+		
 		double startTime;
+		enum ControlSpace {joint, cartesian, dual} controlSpace;
 		int n;								// Degrees of freedom
 		iDynTree::KinDynComputations computer;				// Does all the kinematics & dynamics
 		iDynTree::Model model;						// I don't know what this does
 		iDynTree::Transform torsoPose;
 		iDynTree::Twist torsoTwist;
 		iDynTree::Vector3 gravity;
+		Quintic jointTrajectory;					// Joint level control
 		
 		// Control loop stuff
 		bool threadInit();
@@ -148,13 +154,33 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	}
 	else
 	{
-		iDynTree::VectorDynSize desired = this->q;				// Assume we aren't going to move
+		stop();									// Stop any control threads that are running
 		
-		for(int i = 0; i < position.size(); i++) desired[i] = position[i];	// Override given joints
+		this->controlSpace = joint;						// Set the control space	
+			
+		iDynTree::VectorDynSize desired = this->q;				
+		
+		// Ensure that the target is within joint limits
+		for(int i = 0; i < position.size(); i++)
+		{
+			if(position[i] >= this->qMax[i]) 	desired[i] = this->qMax[i] - 0.001; // Just below the limit
+			else if(position[i] <= this->qMin[i])	desired[i] = this->qMin[i] + 0.001; // Just above the limit
+			else					desired[i] = position[i];
+		}
 		
 		// Compute optimal time scaling
-		// this->jointTrajectory = Quintic(desired, actual, time);
-		// start(); // Go immediately to threadInit()
+		double dt, dq;
+		double endTime = 2.0;
+		for(int i = 0; i < this->n; i++)
+		{
+			dq = abs(desired[i] - this->q[i]);				// Distance to target
+			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);			// Time to reach target at peak velocity
+			if(dt > endTime) endTime = dt;					// If slowes time so far, override
+		}
+		
+		this->jointTrajectory = Quintic(desired, this->q, 0, endTime);		// Create new joint trajectory
+		
+		start(); 								// Go immediately to threadInit()
 		
 		return true;
 	}
@@ -175,7 +201,46 @@ void Humanoid::run()
 	update_state();									// Update the joint state information
 	double elapsedTime = yarp::os::Time::now() - this->startTime;			// Get elapsed time since start
 	
-	// Do stuff
+	switch(this->controlSpace)
+	{
+		case joint:
+		{
+			std::cout << "\nWorker bees can leave." << std::endl;
+			std::cout << "Even drones can fly away." << std::endl;
+			std::cout << "The Queen is their slave.\n" << std::endl;
+						
+			// Get the desired joint state
+			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
+			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
+					
+			iDynTree::FreeFloatingGeneralizedTorques grav(this->model);	// Gravitational force object for given model structure
+			this->computer.generalizedGravityForces(grav);			// Compute the gravitational forces and torques
+			iDynTree::VectorDynSize g = grav.jointTorques();		// Extract only the joint torques
+			
+			iDynTree::VectorDynSize tau(this->n);
+			
+			for(int i = 0; i < this->n; i++)
+			{
+				tau(i) = g(i) + this->Kd*(qdot_d(i) - this->qdot(i)) + this->Kq*(q_d(i) - this->q(i));
+			}
+			
+			break;
+		}
+		case cartesian:
+		{
+			
+			break;
+		}
+		case dual:
+		{
+			
+			break;
+		}
+		default:
+		{
+		
+		}
+	}
 	
 	// Run this function repeatedly until stop() is called
 }
