@@ -20,13 +20,10 @@ class JointInterface
 		bool read_encoders();							// Update the joint states internally
 		
 	protected:
-		iDynTree::VectorDynSize q, qdot;
-	
+		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
 	private:
 		bool isValid = true;							// Won't do calcs if false
 		int n;
-		
-		iDynTree::VectorDynSize qMin, qMax, vLim;
 		
 	   	// These interface with the hardware
 		yarp::dev::IControlLimits*	limits;					// Joint limits?
