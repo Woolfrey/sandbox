@@ -1,8 +1,5 @@
-#include <CartesianTrajectory.h>							// Custom trajectory class
-#include <CubicRotation.h>								// Custom trajectory class
 #include <Haiku.h>									// A simple poem in the form of a haiku
 #include <Humanoid.h>									// Custom robot control class
-#include <QuinticRotation.h>								// Custom trajectory class
 
 int main(int argc, char *argv[])
 {
@@ -16,7 +13,6 @@ int main(int argc, char *argv[])
 	else
 	{
 		std::string file = argv[1];						// Get the urdf model path
-		
 		Humanoid robot(file);							// Create object	
 
 		std::cout << "[INFO] [IMPEDANCECONTROL] All done." << std::endl;
