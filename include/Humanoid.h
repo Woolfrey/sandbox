@@ -112,7 +112,6 @@ Humanoid::Humanoid(const std::string &fileName)
 	// Load a model
 	iDynTree::ModelLoader loader;						// Temporary
 
-//	if(!loader.loadModelFromFile(fileName))
 	if(!loader.loadReducedModelFromFile(fileName, jointList, "urdf"))
 	{
 		std::cerr << "[ERROR] [HUMANOID] Constructor: Could not load model from path " << fileName << std::endl;
@@ -176,17 +175,15 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	else
 	{
 		stop();								// Stop any control threads that are running
-		
-		this->controlSpace = joint;						// Set the control space	
-			
-		iDynTree::VectorDynSize desired = this->q;				
+		this->controlSpace = joint;					// Set the control space		
+		iDynTree::VectorDynSize desired = this->q;			// Assign as current joint state, override later...			
 		
 		// Ensure that the target is within joint limits
 		for(int i = 0; i < position.size(); i++)
 		{
-			if(position[i] >= this->qMax[i]) 	desired[i] = this->qMax[i] - 0.001; // Just below the limit
-			else if(position[i] <= this->qMin[i])	desired[i] = this->qMin[i] + 0.001; // Just above the limit
-			else					desired[i] = position[i];
+			if(position[i] >= this->qMax[i]) 	desired[i] = this->qMax[i] - 0.001;	// Just below the limit
+			else if(position[i] <= this->qMin[i])	desired[i] = this->qMin[i] + 0.001;	// Just above the limit
+			else					desired[i] = position[i];		// Override position
 		}
 		
 		// Compute optimal time scaling
@@ -194,14 +191,14 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 		double endTime = 2.0;
 		for(int i = 0; i < this->n; i++)
 		{
-			dq = abs(desired[i] - this->q[i]);				// Distance to target
-			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);			// Time to reach target at peak velocity
+			dq = abs(desired[i] - this->q[i]);			// Distance to target
+			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);		// Time to reach target at peak velocity
 			if(dt > endTime) endTime = dt;				// If slowes time so far, override
 		}
 		
 		this->jointTrajectory = Quintic(desired, this->q, 0, endTime);	// Create new joint trajectory
 		
-		start(); 								// Go immediately to threadInit()
+		start(); 							// Go immediately to threadInit()
 		
 		return true;
 	}
@@ -240,6 +237,9 @@ void Humanoid::run()
 			{
 				qddot[i] = qddot_d[i] + this->Kd*(qdot_d[i] - qdot[i]) + this->Kq*(q_d[i] - this->q[i]);
 			}
+			
+			std::cout << "\nDesired joint position:" << std::endl;
+			std::cout << q_d.toString() << std::endl;
 					
 			break;
 		}
@@ -259,7 +259,7 @@ void Humanoid::run()
 			break;
 		}
 	}
-	
+/*	
 	// Compute the inverse dynamics
 	iDynTree::VectorDynSize tau(this->n);
 	iDynTree::Vector6 baseAcc; baseAcc.zero();
@@ -269,8 +269,8 @@ void Humanoid::run()
 	{
 		std::cerr << "[ERROR] [HUMANOID] Could not compute inverse dynamics." << std::endl;
 		
-		this->computer.generalizedGravityForces(this->generalizedForces); 		// Just do gravity compensation
-		iDynTree::VectorDynSize g = this->generalizedForces.jointTorques();		// Extract only joint torques
+		this->computer.generalizedGravityForces(this->generalizedForces); 	// Just do gravity compensation
+		iDynTree::VectorDynSize g = this->generalizedForces.jointTorques();	// Extract only joint torques
 		
 		for(int i = 0; i < this->n; i++)
 		{
@@ -279,25 +279,25 @@ void Humanoid::run()
 	}
 	else
 	{
-		tau = this->generalizedForces.jointTorques();					// Get the joint torques needed for control
+		tau = this->generalizedForces.jointTorques();				// Get the joint torques needed for control
 	}
 	
-	send_torque_commands(tau);								// Send the torque commands to the joints
-		
+	send_torque_commands(tau);							// Send the torque commands to the joints
+*/		
 	// Run this function repeatedly until stop() is called
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-//			This is executed just after 'stop()' is calle				      //
+//			This is executed just after 'stop()' is called				  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::threadRelease()
 {
-	this->computer.generalizedGravityForces(this->generalizedForces);			// Get the torque needed to withstand gravity
+	this->computer.generalizedGravityForces(this->generalizedForces);		// Get the torque needed to withstand gravity
 	send_torque_commands(this->generalizedForces.jointTorques());			// Send to the robot
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-//				Prints out stuff for debugging purposes	 	 	      //
+//				Prints out stuff for debugging purposes				  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::print_kinematics()
 {		
