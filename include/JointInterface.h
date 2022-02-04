@@ -1,5 +1,5 @@
 /*
-*	Communication with motor controllers on the iCub robot.
+*	This class handles communication with the motor controllers on the iCub robot.
 */
 
 #ifndef JOINTINTERFACE_H_
@@ -18,11 +18,12 @@ class JointInterface
 		JointInterface(const std::vector<std::string> &jointList);
 		
 		bool read_encoders();							// Update the joint states internally
-		
-		bool send_torque_commands(const iDynTree::VectorDynSize &tau);
+		bool send_torque_commands(const iDynTree::VectorDynSize &tau);		// As it says on the label
+		void close() {this->driver.close();}					// Close the device driver
 		
 	protected:
 		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
+		
 	private:
 		bool isValid = true;							// Won't do calcs if false
 		int n;
@@ -31,8 +32,8 @@ class JointInterface
 		yarp::dev::IControlLimits*	limits;					// Joint limits?
 		yarp::dev::IControlMode*	mode;					// Sets the control mode of the motor
 		yarp::dev::IEncoders*		encoders;				// Joint position values (in degrees)
-		yarp::dev::ITorqueControl*	tControl;
-		yarp::dev::IVelocityControl*	vControl;				// Motor-level velocity controller
+		yarp::dev::ITorqueControl*	controller;
+//		yarp::dev::IVelocityControl*	controller;				// Motor-level velocity controller
 		yarp::dev::PolyDriver		driver;					// Device driver
 	
 };											// Semicolon needed after class declaration
@@ -79,8 +80,7 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList)
 	else
 	{
 		// Try and configure the joint controllers
-//		if(!this->driver.view(this->tControl))
-		if(!this->driver.view(this->vControl))
+		if(!this->driver.view(this->controller))
 		{
 			std::cout << "[ERROR] [JOINTINTERFACE] Constructor: Unable to configure the motor controllers." << std::endl;
 			this->isValid &= false;
@@ -95,11 +95,10 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList)
 			// Success! Set control mode properties for all joints
 			for(int i = 0; i < this->n; i++)
 			{
-				this->mode->setControlMode(i, VOCAB_CM_VELOCITY);				// Put it in velocity mode
-				this->vControl->setRefAcceleration(i, std::numeric_limits<double>::max()); 	// Allow maximum joint acceleration
-				this->vControl->velocityMove(i, 0.0);						// Ensure initial velocity of zero
-				
-				// this->mode->setControlMode(i, torque?)
+				this->mode->setControlMode(i, VOCAB_CM_TORQUE);
+//				this->mode->setControlMode(i, VOCAB_CM_VELOCITY);				// Put it in velocity mode
+//				this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); 	// Allow maximum joint acceleration
+//				this->controller->velocityMove(i, 0.0);						// Ensure initial velocity of zero
 			}
 		}
 		
@@ -184,14 +183,12 @@ bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &tau)
 		std::cerr << "[WARNING] [JOINTINERFACE] send_torque_commands() : Input vector has "
 			<< tau.size() << " elements but there are only " << this->n << " joints." << std::endl;
 			
-		for(int i = 0; i < this->n; i++) this->tControl->setRefTorque(i, tau[i]);
-		
+		for(int i = 0; i < this->n; i++) this->controller->setRefTorque(i, tau[i]);
 		return false;
 	}
 	else
 	{
-		for(int i = 0; i < this->n; i++) this->tControl->setRefTorque(i, tau[i]);
-		
+		for(int i = 0; i < tau.size(); i++) this->controller->setRefTorque(i, tau[i]);
 		return true;
 	}
 }
