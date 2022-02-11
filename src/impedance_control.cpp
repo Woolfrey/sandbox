@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "stop")
 			{
-				robot.stop();						// Stop any control threads
+				robot.halt();						// Stop any control threads, maintain current position
 				output.addString("Fermata");
 			}
 			else if(command == "wave")

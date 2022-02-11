@@ -16,7 +16,8 @@ class JointInterface
 {
 	public:
 		JointInterface(const std::vector<std::string> &jointList);
-		
+
+		bool activate_control();						// Activate the joint control	
 		bool read_encoders();							// Update the joint states internally
 		bool send_torque_commands(const iDynTree::VectorDynSize &tau);		// As it says on the label
 		void close() {this->driver.close();}					// Close the device driver
@@ -38,7 +39,9 @@ class JointInterface
 	
 };											// Semicolon needed after class declaration
 
-/******************** Constructor ********************/
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//					Constructor						  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 JointInterface::JointInterface(const std::vector<std::string> &jointList)
 				: n(jointList.size())
 {
@@ -89,17 +92,6 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList)
 		{
 			std::cerr << "[ERROR] [JOINTINTERFACE] Unable to configure the control mode." << std::endl;
 			this->isValid &= false;
-		}
-		else
-		{
-			// Success! Set control mode properties for all joints
-			for(int i = 0; i < this->n; i++)
-			{
-				this->mode->setControlMode(i, VOCAB_CM_TORQUE);
-//				this->mode->setControlMode(i, VOCAB_CM_VELOCITY);				// Put it in velocity mode
-//				this->controller->setRefAcceleration(i, std::numeric_limits<double>::max()); 	// Allow maximum joint acceleration
-//				this->controller->velocityMove(i, 0.0);						// Ensure initial velocity of zero
-			}
 		}
 		
 		// Now try and obtain the joint limits
@@ -153,7 +145,9 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList)
 	else			this->driver.close();	
 }
 
-/******************** Get new joint encoder information ********************/
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//			Get new joint state information from the encoders			  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool JointInterface::read_encoders()
 {
 	bool success = true;
@@ -175,10 +169,18 @@ bool JointInterface::read_encoders()
 	return success;
 }
 
-/******************** Send torque commands to the joints ********************/
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//				Send torque commands to the joints				  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &tau)
 {
-	if(tau.size() > this->n)
+	if(!this->isValid)
+	{
+		std::cerr << "[ERROR] [JOINTINTERFACE] send_torque_commands() : There was a problem with the construction of this object. "
+			<< " Joint commands not sent." << std:: endl;
+		return false;
+	}
+	else if(tau.size() > this->n)
 	{
 		std::cerr << "[WARNING] [JOINTINERFACE] send_torque_commands() : Input vector has "
 			<< tau.size() << " elements but there are only " << this->n << " joints." << std::endl;
@@ -190,6 +192,24 @@ bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &tau)
 	{
 		for(int i = 0; i < tau.size(); i++) this->controller->setRefTorque(i, tau[i]);
 		return true;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//			Set control mode and allow commands to be sent				  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool JointInterface::activate_control()
+{
+	if(this->isValid)
+	{
+		for(int i = 0; i < this->n; i++) this->mode->setControlMode(i, VOCAB_CM_TORQUE);
+		return true;
+	}
+	else
+	{
+		std::cerr << "[ERROR] [JOINTINTERFACE] activate_control() : There was a problem during the construction of this object. "
+			<< "Joint control not activated." << std::endl;
+		return false;
 	}
 }
 
