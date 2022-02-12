@@ -20,7 +20,7 @@ class JointInterface
 		bool activate_control();						// Activate the joint control	
 		bool read_encoders();							// Update the joint states internally
 		bool send_torque_commands(const iDynTree::VectorDynSize &tau);		// As it says on the label
-		void close() {this->driver.close();}					// Close the device driver
+		void close();					// Close the device driver
 		
 	protected:
 		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
@@ -34,7 +34,6 @@ class JointInterface
 		yarp::dev::IControlMode*	mode;					// Sets the control mode of the motor
 		yarp::dev::IEncoders*		encoders;				// Joint position values (in degrees)
 		yarp::dev::ITorqueControl*	controller;
-//		yarp::dev::IVelocityControl*	controller;				// Motor-level velocity controller
 		yarp::dev::PolyDriver		driver;					// Device driver
 	
 };											// Semicolon needed after class declaration
@@ -193,6 +192,19 @@ bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &tau)
 		for(int i = 0; i < tau.size(); i++) this->controller->setRefTorque(i, tau[i]);
 		return true;
 	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//			Close the device interfaces on the robot				  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void JointInterface::close()
+{
+	if(this->isValid)
+	{
+		// Put it in to position mode to lock the joints
+		for(int i = 0; i < this->n; i++) this->mode->setControlMode(i, VOCAB_CM_POSITION);
+	}
+	this->driver.close();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
