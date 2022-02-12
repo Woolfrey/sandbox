@@ -16,6 +16,10 @@
 #include <Quintic.h>								// Custom trajectory class
 #include <yarp/os/PeriodicThread.h>						// Keeps timing of the control loop
 
+std::vector<double> startConfiguration({ 00.00,  00.00,  00.00,									// Torso
+					-30.00*M_PI/180,  30.00*M_PI/180,  00.00,  45.00*M_PI/180,  00.00,  00.00,  00.00,	// Left arm
+					-30.00*M_PI/180,  30.00*M_PI/180,  00.00,  45.00*M_PI/180,  00.00,  00.00,  00.00});	// Right arm
+
 std::vector<std::string> jointList = {// Torso
 					  "torso_pitch"
 					, "torso_roll"
@@ -25,11 +29,17 @@ std::vector<std::string> jointList = {// Torso
 					, "l_shoulder_roll"
 					, "l_shoulder_yaw"
 					, "l_elbow"
+					, "l_wrist_prosup"
+					, "l_wrist_pitch"
+					, "l_wrist_yaw"
 					// Right Arm
 					, "r_shoulder_pitch"
 					, "r_shoulder_roll"
 					, "r_shoulder_yaw"
-					, "r_elbow"};
+					, "r_elbow"
+					, "r_wrist_prosup"
+					, "r_wrist_pitch"
+					, "r_wrist_yaw"};
 					// Left Leg
 //					, "l_hip_pitch"
 //					, "l_hip_roll"
@@ -70,7 +80,7 @@ class Humanoid	: public yarp::os::PeriodicThread
 		
 		// Joint Control
 		double Kq = 50;							// Proportional gain
-		double Kd = 2*sqrt(Kq);						// Derivative gain
+		double Kd = 3.0;						// Derivative gain
 		Quintic jointTrajectory;					// Joint level control
 		
 		// Cartesian Control
@@ -98,7 +108,7 @@ class Humanoid	: public yarp::os::PeriodicThread
 };										// Semicolon needed after a class declaration
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-//		   			Constructor 						      //
+//		   			Constructor 						  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Humanoid::Humanoid(const std::string &fileName)
 	: yarp::os::PeriodicThread(0.01)					// Create the threading object for control
@@ -137,7 +147,7 @@ Humanoid::Humanoid(const std::string &fileName)
 			update_state();						// Get the current joint state
 			if(activate_control())
 			{
-				move_to_position(this->q);
+				move_to_position(iDynTree::VectorDynSize(startConfiguration));
 			}
 			else	std::cerr << "[ERROR] [HUMANOID] Constructor: Could not activate joint control." << std::endl;
 		}
@@ -199,7 +209,7 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 				desired[i] = this->qMin[i] + 0.001;		// Just above the limit
 				warning = true;
 			}
-			else					desired[i] = position[i];		// Override position
+			else	desired[i] = position[i];			// Override position
 		}
 		
 		if(warning)
@@ -218,7 +228,7 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 			if(dt > endTime) endTime = dt;				// If slowes time so far, override
 		}
 		
-		this->jointTrajectory = Quintic(desired, this->q, 0, endTime);	// Create new joint trajectory
+		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);	// Create new joint trajectory
 		
 		start(); 							// Go immediately to threadInit()
 		
@@ -251,67 +261,41 @@ bool Humanoid::threadInit()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::run()
 {
-	update_state();								// Update the joint state information
-	double elapsedTime = yarp::os::Time::now() - this->startTime;		// Get elapsed time since start
+	update_state();									// Update the joint state information
+	double elapsedTime = yarp::os::Time::now() - this->startTime;			// Get elapsed time since start
 	
-	iDynTree::VectorDynSize qddot(this->n); qddot.zero();			// Value to be computed
+	iDynTree::VectorDynSize qddot(this->n); 					// We want to compute this
 	
 	switch(this->controlSpace)
 	{
 		case joint:
-		{						
+		{
 			// Get the desired joint state
-			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
+			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n), e(this->n);
 			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
 			
-			iDynTree::VectorDynSize qddot(this->n);
 			for(int i = 0; i < this->n; i++)
 			{
-				qddot[i] = qddot_d[i] + this->Kd*(qdot_d[i] - qdot[i]) + this->Kq*(q_d[i] - this->q[i]);
+				qddot[i] = qddot_d[i] + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]);
 			}
-					
 			break;
 		}
 		case cartesian:
 		{
-			haiku();			
-			break;
-		}
-		case dual:
-		{
-			haiku();					
 			break;
 		}
 		default:
 		{
 			haiku();
-			break;
 		}
 	}
 
 	// Compute the inverse dynamics
-	iDynTree::VectorDynSize tau(this->n);
 	iDynTree::Vector6 baseAcc; baseAcc.zero();
 	iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();
-	
-	if(!this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalizedForces))
-	{
-		std::cerr << "[ERROR] [HUMANOID] Could not compute inverse dynamics." << std::endl;
-		
-		this->computer.generalizedGravityForces(this->generalizedForces); 	// Just do gravity compensation
-		iDynTree::VectorDynSize g = this->generalizedForces.jointTorques();	// Extract only joint torques
-		
-		for(int i = 0; i < this->n; i++)
-		{
-			tau[i] = g[i] - this->Kd*this->qdot[i];				// Try not to move!
-		}
-	}
-	else
-	{
-		tau = this->generalizedForces.jointTorques();				// Get the joint torques needed for control
-	}
-
-	send_torque_commands(tau);							// Send the torque commands to the joints
+	this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalizedForces);
+	iDynTree::VectorDynSize tau = this->generalizedForces.jointTorques();
+	send_torque_commands(tau);
 		
 	// Run this function repeatedly until stop() is called
 }
