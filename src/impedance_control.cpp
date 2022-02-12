@@ -75,8 +75,13 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "receive")
 			{
-//				controller.move_to_position(receive);
+				robot.move_to_position(iDynTree::VectorDynSize(receive));
 				output.addString("Grazie");
+			}
+			else if(command == "shake")
+			{
+				robot.move_to_position(iDynTree::VectorDynSize(shake));
+				output.addString("Piacere");
 			}
 			else if(command == "stop")
 			{
@@ -85,7 +90,7 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "wave")
 			{
-//				controller.move_to_position(const iDynTree::VectorDynSize &position);
+				robot.move_to_position(iDynTree::VectorDynSize(wave));
 				output.addString("Ciao");
 			}
 			else
