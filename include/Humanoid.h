@@ -72,6 +72,8 @@ class Humanoid	: public yarp::os::PeriodicThread
 		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
 		void halt();							// Stop any control and maintain current position
 		
+		void force_test();
+		
 	private:
 		bool isValid = true;						// Will not do computations if true
 		enum ControlSpace {joint, cartesian, dual} controlSpace;
@@ -247,13 +249,23 @@ void Humanoid::halt()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+//				Testing Cartesian force control					  //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void Humanoid::force_test()
+{
+	if(isRunning()) stop();
+	this->controlSpace = cartesian;
+	start();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 //			This is executed just after 'start()' is called				  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::threadInit()
 {
 	this->startTime = yarp::os::Time::now();
 	return true;
-	// Go immediately to run()
+// 	run();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,12 +276,14 @@ void Humanoid::run()
 	update_state();									// Update the joint state information
 	double elapsedTime = yarp::os::Time::now() - this->startTime;			// Get elapsed time since start
 	
-	iDynTree::VectorDynSize qddot(this->n); 					// We want to compute this
-	
+	iDynTree::VectorDynSize tau(this->n);						// We want to compute this
+
 	switch(this->controlSpace)
 	{
 		case joint:
 		{
+			iDynTree::VectorDynSize qddot(this->n); 			// We want to compute this
+			
 			// Get the desired joint state
 			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n), e(this->n);
 			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
@@ -278,10 +292,46 @@ void Humanoid::run()
 			{
 				qddot[i] = qddot_d[i] + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]);
 			}
+			
+			// Compute the inverse dynamics from the joint accelerations
+			iDynTree::Vector6 baseAcc; baseAcc.zero();						// Don't move the base
+			iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();			// No external forces applied
+			this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalizedForces);	// Solve the inverse dynamics
+			tau = this->generalizedForces.jointTorques();						// Get the joint torques
+			
 			break;
 		}
 		case cartesian:
 		{
+			// Compute the gravity compensation
+			this->computer.generalizedGravityForces(this->generalizedForces);
+			tau = this->generalizedForces.jointTorques();
+		
+			// Compute the torques from forces at the hand
+			Eigen::MatrixXd J(6, 6 + this->n);
+			this->computer.getFrameFreeFloatingJacobian("l_hand", J);
+			J = J.block(0,6,6,10); 									// Just the Jacobian for the hand
+
+			Eigen::VectorXd f(6);
+			f << 0, -2, -2, 0, 0, 0;								// Force vector	
+			Eigen::VectorXd temp = J.transpose()*f;
+
+			for(int i = 0; i < 10; i++) tau[i] += temp[i];		
+/*
+			// Compute the inertia matrix
+			Eigen::MatrixXd M(6+this->n, 6+this->n);
+			this->computer.getFreeFloatingMassMatrix(M);
+			std::cout << "\nHere is the inertia matrix:" << std::endl;
+			std::cout << M << std::endl;
+			
+			// Compute Coriolis & gravity
+			this->computer.generalizedBiasForces(this->generalizedForces);
+			iDynTree::VectorDynSize h = this->generalizedForces.jointTorques();
+			std::cout << "\nHere is the feedback linearization term:" << std::endl;
+			std::cout << h.toString() << std::endl;
+			iDynTree::Vector6 Jdotqdot = this->computer.getFrameBiasAcc("l_hand");
+			std::cout<< Jdotqdot.toString() << std::endl;
+*/
 			break;
 		}
 		default:
@@ -290,14 +340,9 @@ void Humanoid::run()
 		}
 	}
 
-	// Compute the inverse dynamics
-	iDynTree::Vector6 baseAcc; baseAcc.zero();
-	iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();
-	this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalizedForces);
-	iDynTree::VectorDynSize tau = this->generalizedForces.jointTorques();
 	send_torque_commands(tau);
 		
-	// Run this function repeatedly until stop() is called
+//	if(stop()) threadRelease();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
