@@ -68,6 +68,11 @@ int main(int argc, char *argv[])
 				output.addString("Arrivederci");
 				active = false;						// This will break the 'while' loop
 			}
+			else if(command == "force")					// Test force applied at the hand
+			{
+				robot.force_test();
+				output.addString("Testing.");
+			}
 			else if(command == "home")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(home));
