@@ -1,48 +1,50 @@
-/*
-*	This class handles communication with the motor controllers on the iCub robot.
-*/
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                   //
+//                     A class for interfacing with the joint motors on the iCub                    //
+//                                                                                                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef JOINTINTERFACE_H_
 #define JOINTINTERFACE_H_
 
-#include <iDynTree/Core/VectorDynSize.h>						// iDynTree::VectorDynSize
-#include <string>									// std::string
-#include <vector>									// std::vector
-#include <yarp/dev/ControlBoardInterfaces.h>						// I don't know what this does exactly...
-#include <yarp/dev/PolyDriver.h>							// ... or this...
-#include <yarp/os/Property.h>								// ... or this.
+#include <iDynTree/Core/VectorDynSize.h>                                                 // iDynTree::VectorDynSize
+#include <string>                                                                        // std::string
+#include <vector>                                                                        // std::vector
+#include <yarp/dev/ControlBoardInterfaces.h>                                             // I don't know what this does exactly...
+#include <yarp/dev/PolyDriver.h>                                                         // ... or this...
+#include <yarp/os/Property.h>                                                            // ... or this.
 
 class JointInterface
 {
 	public:
 		JointInterface(const std::vector<std::string> &jointList);
 
-		bool activate_control();						// Activate the joint control	
-		bool read_encoders();							// Update the joint states internally
-		bool send_torque_commands(const iDynTree::VectorDynSize &tau);		// As it says on the label
-		void close();					// Close the device driver
+		bool activate_control();                                                 // Activate the joint control	
+		bool read_encoders();                                                    // Update the joint states internally
+		bool send_torque_commands(const iDynTree::VectorDynSize &tau);           // As it says on the label
+		void close();                                                            // Close the device driver
 		
 	protected:
 		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
 		
 	private:
-		bool isValid = true;							// Won't do calcs if false
-		int n;
+		bool isValid = true;                                                     // Won't do calcs if false
+		int n;                                                                   // Number of joints being controlled
 		
 	   	// These interface with the hardware
-		yarp::dev::IControlLimits*	limits;					// Joint limits?
-		yarp::dev::IControlMode*	mode;					// Sets the control mode of the motor
-		yarp::dev::IEncoders*		encoders;				// Joint position values (in degrees)
-		yarp::dev::ITorqueControl*	controller;
-		yarp::dev::PolyDriver		driver;					// Device driver
+		yarp::dev::IControlLimits*  limits;                                      // Joint limits?
+		yarp::dev::IControlMode*    mode;                                        // Sets the control mode of the motor
+		yarp::dev::IEncoders*       encoders;                                    // Joint position values (in degrees)
+		yarp::dev::ITorqueControl*  controller;
+		yarp::dev::PolyDriver       driver;                                      // Device driver
 	
-};											// Semicolon needed after class declaration
+};                                                                                       // Semicolon needed after class declaration
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //					Constructor						  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-JointInterface::JointInterface(const std::vector<std::string> &jointList)
-				: n(jointList.size())
+JointInterface::JointInterface(const std::vector<std::string> &jointList):
+                               n(jointList.size())
 {
 	// Resize arrays, vectors
 	q.resize(this->n);
@@ -152,11 +154,11 @@ bool JointInterface::read_encoders()
 	bool success = true;
 	for(int i = 0; i < this->n; i++)
 	{
-		success &= this->encoders->getEncoder(i, &this->q[i]);			// Read the position
-		success &= this->encoders->getEncoderSpeed(i, &this->qdot[i]);		// Read the velocity
+		success &= this->encoders->getEncoder(i, &this->q[i]);                   // Read the position
+		success &= this->encoders->getEncoderSpeed(i, &this->qdot[i]);           // Read the velocity
 		
-		this->q[i] *= M_PI/180;							// Convert to rad
-		this->qdot[i] *= M_PI/180;						// Convert to rad/s
+		this->q[i] *= M_PI/180;                                                  // Convert to rad
+		this->qdot[i] *= M_PI/180;                                               // Convert to rad/s
 		
 		// Sensor noise can give readings above or below limits so cap them
 		if(this->q[i] > this->qMax[i]) this->q[i] = this->qMax[i];

@@ -1,46 +1,50 @@
-/*
-*	A trajectory across two or more poses (position & rotation) in 3D space.
-*/
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                   //
+//          A trajectory across two or more poses (position & orientation) in 3D space.             //
+//                                                                                                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef CARTESIANTRAJECTORY_H_
 #define CARTESIANTRAJECTORY_H_
 
-#include <iDynTree/Core/GeomVector3.h>							// iDynTree::GeomVector3
-#include <iDynTree/Core/Position.h>							// iDynTree::Position
-#include <iDynTree/Core/Rotation.h>							// iDynTree::Rotation
-#include <iDynTree/Core/SpatialAcc.h>							// iDynTree::SpatialAcc
-#include <iDynTree/Core/Transform.h>							// iDynTree::Transform
-#include <iDynTree/Core/Twist.h>							// iDynTree::Twist
-#include <iDynTree/Core/VectorDynSize.h>						// iDynTree::VectorDynSize
-#include <QuinticRotation.h>									// Also includes Quintic.h
+#include <iDynTree/Core/GeomVector3.h>                                                   // iDynTree::GeomVector3
+#include <iDynTree/Core/Position.h>                                                      // iDynTree::Position
+#include <iDynTree/Core/Rotation.h>                                                      // iDynTree::Rotation
+#include <iDynTree/Core/SpatialAcc.h>                                                    // iDynTree::SpatialAcc
+#include <iDynTree/Core/Transform.h>                                                     // iDynTree::Transform
+#include <iDynTree/Core/Twist.h>                                                         // iDynTree::Twist
+#include <iDynTree/Core/VectorDynSize.h>                                                 // iDynTree::VectorDynSize
+#include <QuinticRotation.h>                                                             // Also includes Quintic.h
 
 class CartesianTrajectory
 {
 	public:
-		CartesianTrajectory () {}
+		CartesianTrajectory () {}                                                // Empty constructor
 		
 		CartesianTrajectory(const iDynTree::Transform &startPose,
-				const iDynTree::Transform &endPose,
-				const double &startTime,
-				const double &endTime);
+				    const iDynTree::Transform &endPose,
+				    const double &startTime,
+				    const double &endTime);
 	
 		bool get_state(iDynTree::Transform &pose,
-				iDynTree::Twist &vel,
-				iDynTree::SpatialAcc &acc,
-				const double &time);
+			       iDynTree::Twist &vel,
+			       iDynTree::SpatialAcc &acc,
+			       const double &time);
 	private:
-		iDynTree::Transform T0;							// Initial transform
-		Quintic transTraj;							// Translation trajectory
-		QuinticRotation rotTraj;						// Rotation trajectory
+		iDynTree::Transform T0;                                                  // Initial transform
+		Quintic transTraj;                                                       // Translation trajectory
+		QuinticRotation rotTraj;                                                 // Rotation trajectory
 	
-};											// Semicolon needed after class declaration
+};                                                                                       // Semicolon needed after class declaration
 
-/******************** Constructor for 2 waypoints **********/
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                 A constructor for 2 poses                                       //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 CartesianTrajectory::CartesianTrajectory(const iDynTree::Transform &startPose,
-				const iDynTree::Transform &endPose,
-				const double &startTime,
-				const double &endTime)
-				: T0(startPose)
+					 const iDynTree::Transform &endPose,
+					 const double &startTime,
+					 const double &endTime):
+					 T0(startPose)
 {
 	// Extract the positions and put them in to vectors
 	iDynTree::Position startPoint = startPose.getPosition();
@@ -57,11 +61,13 @@ CartesianTrajectory::CartesianTrajectory(const iDynTree::Transform &startPose,
 	this->rotTraj = QuinticRotation(startPose.getRotation(), endPose.getRotation(), startTime, endTime);
 }
 
-/******************** Get the desired state for the given time **********/
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//                     Get the desired Cartesian state for the given time                          //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
-				iDynTree::Twist &vel,
-				iDynTree::SpatialAcc &acc,
-				const double &time)
+				    iDynTree::Twist &vel,
+				    iDynTree::SpatialAcc &acc,
+				    const double &time)
 {
 	// Variables used in this scope
 	iDynTree::GeomVector3 linearVel, angularVel, linearAcc, angularAcc;
