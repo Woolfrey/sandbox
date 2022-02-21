@@ -67,13 +67,17 @@ class Humanoid : public yarp::os::PeriodicThread,
 	public:
 		Humanoid(const std::string &fileName);                                   // Constructor
 		
+		// Get Functions
+		iDynTree::Transform get_hand_pose(const std::string &whichHand);
+		iDynTree::Vector6 get_pose_error(const iDynTree::Transform &desired, const iDynTree::Transform &actual);
+		
+		// Control Functions
 		bool update_state();	
 		bool move_to_position(const iDynTree::VectorDynSize &position);
 		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);
 		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
 		void halt();                                                             // Stop any control and maintain current position
-		
-		void force_test();
+		void force_test();							 // T
 		
 	private:
 		bool isValid = true;                                                     // Will not do computations if true
@@ -157,6 +161,32 @@ Humanoid::Humanoid(const std::string &fileName) :
 			else	std::cerr << "[ERROR] [HUMANOID] Constructor: Could not activate joint control." << std::endl;
 		}
 	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//                               Get the pose of one of the hands                                 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+iDynTree::Transform Humanoid::get_hand_pose(const std::string &whichHand)
+{
+	if(whichHand == "left")       return this->computer.getWorldTransform("l_hand");
+	else if(whichHand == "right") return this->computer.getWorldTransform("r_hand");
+	else
+	{
+		std::cerr << "[ERROR] [HUMANOID] get_hand_pose() : String input was " << whichHand
+			  << " but expected 'left' or 'right' as an argument. Returning left hand pose by default." << std::endl;
+		return this->computer.getWorldTransform("l_hand");
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//                   Compute the error between 2 poses for feedback purposes                      //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
+                                           const iDynTree::Transform &actual)
+{
+	iDynTree::Vector6 error;                                                         // Value to be returned
+	
+	return error;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -353,8 +383,20 @@ void Humanoid::run()
 		}
 		case cartesian:
 		{
-			// Variables used in scope
+			// Compute the gravity compensation
+			this->computer.generalizedGravityForces(this->generalizedForces);
+			tau = this->generalizedForces.jointTorques();
 			
+			// Variables used in scope
+			iDynTree::Transform x_d;                                           // Desired pose
+			iDynTree::Twist xdot_d;                                            // Desired velocity
+			iDynTree::SpatialAcc xddot_d;                                      // Desired acceleration
+			
+			// Get the desired state for the left hand
+			std::cout << "So far so good." << std::endl;
+			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);
+			std::cout << "\nHere is the desired position of the left hand:" << std::endl;
+			std::cout << x_d.getPosition().toString() << std::endl;
 /*
 			// Compute the gravity compensation
 			this->computer.generalizedGravityForces(this->generalizedForces);

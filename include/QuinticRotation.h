@@ -85,8 +85,13 @@ bool QuinticRotation::get_state(iDynTree::Rotation &rot,
 	iDynTree::VectorDynSize p(3), v(3), a(3);                                        // Position, velocity, and acceleration
 	iDynTree::Vector4 dQ;                                                            // Difference in orientation as a quaternion
 	
+	std::cout << "We are in the Quintic Rotation object." << std::endl;
+	
+	std::cout << "UNABLE TO ACCESS BASE CLASS! HAS IT BEEN SET PROPERLY?" << std::endl;
 	if(Quintic::get_state(p, v, a, time))
 	{
+		std::cout << "State obtained from base class." << std::endl;
+		
 		for(int i = 0; i < 3; i++) angle += p[i]*p[i];                           // Sum of squares
 		angle = sqrt(angle);                                                     // This completes the norm
 	

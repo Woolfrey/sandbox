@@ -78,6 +78,7 @@ bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
 	// Get the desired state from the trajectory objects
 	if(this->transTraj.get_state(p, v, a, time) && this->rotTraj.get_state(rot, angularVel, angularAcc, time))
 	{
+		std::cout << "Is the problem here?" << std::endl;
 		for(int i = 0; i < 3; i++)
 		{
 			pos[i] = p[i];
@@ -85,6 +86,7 @@ bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
 			linearAcc[i] = a[i];
 		}
 	
+		std::cout << "Testing." << std::endl;
 		// Put them in to the return values
 		pose.setPosition(pos);
 		pose.setRotation(rot);
