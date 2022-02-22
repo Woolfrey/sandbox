@@ -1,21 +1,21 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                   //
-//                                  A control class for the iCub robot                              //
-//                                                                                                 //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+   //                                                                                                //
+  //                                  A control class for the iCub robot                            //
+ //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef HUMANOID_H_
 #define HUMANOID_H_
 
-#include <CartesianTrajectory.h>                                                         // Custom trajectory class
-#include <Eigen/Dense>                                                                   // Eigen::MatrixXd
+#include <CartesianTrajectory.h>                                                                   // Custom trajectory class
+#include <Eigen/Dense>                                                                             // Eigen::MatrixXd
 #include <Haiku.h>
-#include <iDynTree/KinDynComputations.h>                                                 // Class that does inverse dynamics calculations
-#include <iDynTree/Model/FreeFloatingState.h>                                            // iDynTree::FreeFloatingGeneralizedTorques
-#include <iDynTree/Model/Model.h>                                                        // Class that holds basic kinematic & dynamic info
-#include <iDynTree/ModelIO/ModelLoader.h>                                                // Extracts information from URDF
-#include <JointInterface.h>                                                              // Interfaces with motors on the robot
-#include <Quintic.h>                                                                     // Custom trajectory class
-#include <yarp/os/PeriodicThread.h>                                                      // Keeps timing of the control loop
+#include <iDynTree/KinDynComputations.h>                                                           // Class that does inverse dynamics calculations
+#include <iDynTree/Model/FreeFloatingState.h>                                                      // iDynTree::FreeFloatingGeneralizedTorques
+#include <iDynTree/Model/Model.h>                                                                  // Class that holds basic kinematic & dynamic info
+#include <iDynTree/ModelIO/ModelLoader.h>                                                          // Extracts information from URDF
+#include <JointInterface.h>                                                                        // Interfaces with motors on the robot
+#include <Quintic.h>                                                                               // Custom trajectory class
+#include <yarp/os/PeriodicThread.h>                                                                // Keeps timing of the control loop
 
 std::vector<double> startConfiguration({ 00.00,  00.00,  00.00,                                                              // Torso
 					-30.00*M_PI/180,  30.00*M_PI/180,  00.00,  45.00*M_PI/180,  00.00,  00.00,  00.00,   // Left arm
@@ -65,7 +65,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 	         public JointInterface
 {
 	public:
-		Humanoid(const std::string &fileName);                                   // Constructor
+		Humanoid(const std::string &fileName);                                             // Constructor
 		
 		// Get Functions
 		iDynTree::Transform get_hand_pose(const std::string &whichHand);
@@ -76,53 +76,53 @@ class Humanoid : public yarp::os::PeriodicThread,
 		bool move_to_position(const iDynTree::VectorDynSize &position);
 		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);
 		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
-		void halt();                                                             // Stop any control and maintain current position
-		void force_test();							 // T
+		void halt();                                                                       // Stop any control and maintain current position
+		void force_test();							          
 		
 	private:
-		bool isValid = true;                                                     // Will not do computations if true
+		bool isValid = true;                                                               // Will not do computations if true
 		enum ControlSpace {joint, cartesian, dual} controlSpace;
 		
-		iDynTree::FreeFloatingGeneralizedTorques generalizedForces;              // Forces and torques
+		iDynTree::FreeFloatingGeneralizedTorques generalizedForces;                        // Forces and torques
 		
 		// Joint Control
-		double Kq = 50;                                                          // Proportional gain
-		double Kd = 3.0;                                                         // Derivative gain
-		Quintic jointTrajectory;                                                 // Joint level control
+		double Kq = 50;                                                                    // Proportional gain
+		double Kd = 3.0;                                                                   // Derivative gain
+		Quintic jointTrajectory;                                                           // Joint level control
 		
 		// Cartesian Control
-		CartesianTrajectory leftHandTrajectory, rightHandTrajectory;             // Internal Cartesian trajectory generatory
-		iDynTree::MatrixDynSize K;                                               // Cartesian stiffness
-		iDynTree::MatrixDynSize D;                                               // Cartesian damping
+		CartesianTrajectory leftHandTrajectory, rightHandTrajectory;                       // Internal Cartesian trajectory generatory
+		iDynTree::MatrixDynSize K;                                                         // Cartesian stiffness
+		iDynTree::MatrixDynSize D;                                                         // Cartesian damping
 		
 		// Kinematics & dynamics
-		int n;                                                                   // Degrees of freedom
-		iDynTree::KinDynComputations computer;                                   // Does all the kinematics & dynamics
-		iDynTree::Model model;                                                   // I don't know what this does
+		int n;                                                                             // Degrees of freedom
+		iDynTree::KinDynComputations computer;                                             // Does all the kinematics & dynamics
+		iDynTree::Model model;                                                             // I don't know what this does
 		iDynTree::Transform torsoPose;
 		iDynTree::Twist torsoTwist;
 		iDynTree::Vector3 gravity;
 		
 		// Functions
-		Eigen::MatrixXd inverse(const Eigen::MatrixXd &A);                       // Get the inverse of the given matrix
-		void print_kinematics();                                                 // Used for debugging
-		void print_dynamics();                                                   // Used for debugging
+		Eigen::MatrixXd inverse(const Eigen::MatrixXd &A);                                 // Get the inverse of the given matrix
+		void print_kinematics();                                                           // Used for debugging
+		void print_dynamics();                                                             // Used for debugging
 		
 		// Control loop stuff
-		double startTime;                                                        // Used to time the control loop
-		bool threadInit();                                                       // From yarp::os::PeriodicThread class
-		void run();                                                              // From yarp::os::PeriodicThread class
-		void threadRelease();                                                    // From yarp::os::PeriodicThread class
+		double startTime;                                                                  // Used to time the control loop
+		bool threadInit();                                                                 // From yarp::os::PeriodicThread class
+		void run();                                                                        // From yarp::os::PeriodicThread class
+		void threadRelease();                                                              // From yarp::os::PeriodicThread class
 		
-};                                                                                       // Semicolon needed after a class declaration
+};                                                                                                 // Semicolon needed after a class declaration
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                            Constructor                                         //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                            Constructor                                        //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 Humanoid::Humanoid(const std::string &fileName) :
-	           yarp::os::PeriodicThread(0.01),                                       // Create the threading object for control
-                   JointInterface(jointList),                                            // Open communication with the robot
-                   torsoPose(iDynTree::Transform::Identity()),                           // Set the default pose for the model
+	           yarp::os::PeriodicThread(0.01),                                                 // Create the threading object for control
+                   JointInterface(jointList),                                                      // Open communication with the robot
+                   torsoPose(iDynTree::Transform::Identity()),                                     // Set the default pose for the model
                    torsoTwist(iDynTree::Twist(iDynTree::GeomVector3(0,0,0), iDynTree::GeomVector3(0,0,0)))
 {
 	// Set the gravity vector
@@ -131,7 +131,7 @@ Humanoid::Humanoid(const std::string &fileName) :
 	this->gravity(2) =-9.81;
 	
 	// Load a model
-	iDynTree::ModelLoader loader;                                                    // Temporary
+	iDynTree::ModelLoader loader;                                                              // Temporary
 
 	if(!loader.loadReducedModelFromFile(fileName, jointList, "urdf"))
 	{
@@ -147,13 +147,13 @@ Humanoid::Humanoid(const std::string &fileName) :
 		}
 		else
 		{
-			this->model = computer.model();                                  // Get the model from the computer
-			this->n = model.getNrOfDOFs();                                   // Degrees of freedom / number of joints
-			this->generalizedForces.resize(this->model);                     // Restructure the GeneralizedTorque class to match the model
+			this->model = computer.model();                                            // Get the model from the computer
+			this->n = model.getNrOfDOFs();                                             // Degrees of freedom / number of joints
+			this->generalizedForces.resize(this->model);                               // Restructure force class to match model
 			
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 	
-			update_state();                                                  // Get the current joint state
+			update_state();                                                            // Get the current joint state
 			if(activate_control())
 			{
 				move_to_position(iDynTree::VectorDynSize(startConfiguration));
@@ -163,8 +163,8 @@ Humanoid::Humanoid(const std::string &fileName) :
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                               Get the pose of one of the hands                                 //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                               Get the pose of one of the hands                                //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 iDynTree::Transform Humanoid::get_hand_pose(const std::string &whichHand)
 {
@@ -178,19 +178,19 @@ iDynTree::Transform Humanoid::get_hand_pose(const std::string &whichHand)
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                   Compute the error between 2 poses for feedback purposes                      //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                   Compute the error between 2 poses for feedback purposes                     //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
                                            const iDynTree::Transform &actual)
 {
-	iDynTree::Vector6 error;                                                         // Value to be returned
+	iDynTree::Vector6 error;                                                                   // Value to be returned
 	
 	return error;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                Update the joint state for all the limbs                        //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                Update the joint state for all the limbs                       //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::update_state()
 {
@@ -214,8 +214,8 @@ bool Humanoid::update_state()
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                             Move the joints to a desired configuration                         //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                             Move the joints to a desired configuration                        //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 {
@@ -227,9 +227,9 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	}
 	else
 	{
-		if(isRunning()) stop();                                                  // Stop any control threads that are running
-		this->controlSpace = joint;                                              // Set the control space		
-		iDynTree::VectorDynSize desired = this->q;                               // Assign as current joint state, override later...
+		if(isRunning()) stop();                                                            // Stop any control threads that are running
+		this->controlSpace = joint;                                                        // Set the control space		
+		iDynTree::VectorDynSize desired = this->q;                                         // Assign as current joint state, override later...
 				
 		// Ensure that the target is within joint limits
 		bool warning = false;
@@ -237,15 +237,15 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 		{
 			if(position[i] >= this->qMax[i])
 			{
-				desired[i] = this->qMax[i] - 0.001;                      // Just below the limit
+				desired[i] = this->qMax[i] - 0.001;                                // Just below the limit
 				warning = true;
 			}
 			else if(position[i] <= this->qMin[i])
 			{
-				desired[i] = this->qMin[i] + 0.001;                      // Just above the limit
+				desired[i] = this->qMin[i] + 0.001;                                // Just above the limit
 				warning = true;
 			}
-			else	desired[i] = position[i];                                // Override position
+			else	desired[i] = position[i];                                          // Override position
 		}
 		
 		if(warning)
@@ -259,38 +259,38 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 		double endTime = 2.0;
 		for(int i = 0; i < this->n; i++)
 		{
-			dq = abs(desired[i] - this->q[i]);                               // Distance to target
-			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);                       // Time to reach target at peak velocity
-			if(dt > endTime) endTime = dt;                                   // If slowes time so far, override
+			dq = abs(desired[i] - this->q[i]);                                         // Distance to target
+			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);                                 // Time to reach target at peak velocity
+			if(dt > endTime) endTime = dt;                                             // If slowes time so far, override
 		}
 		
-		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);           // Create new joint trajectory
+		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);                     // Create new joint trajectory
 		
-		start();                                                                 // Go immediately to threadInit()
+		start();                                                                           // Go immediately to threadInit()
 		
 		return true;
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                   Move one hand to a desired pose                              //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                   Move one hand to a desired pose                             //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand)
 {
 	if(whichHand == "left")
 	{
-		if(isRunning()) stop();                                                  // Stop any control threads that are running
-		this->controlSpace = cartesian;                                          // Switch to Cartesian control
+		if(isRunning()) stop();                                                            // Stop any control threads that are running
+		this->controlSpace = cartesian;                                                    // Switch to Cartesian control
 		
 		// TO DO: CHECK THE POSE IS WITHIN THE WORKSPACE
 		// TO DO: COMPUTE AN 'OPTIMAL' TRAJECTORY TIME
 		double endTime = 5.0;
 
-		iDynTree::Transform T = this->computer.getWorldTransform("l_hand");      // Get the current pose of the left hand
-		this->leftHandTrajectory = CartesianTrajectory(T, pose, 0.0, endTime);   // Move left hand from the current pose to the given pose
+		iDynTree::Transform T = this->computer.getWorldTransform("l_hand");                // Get the current pose of the left hand
+		this->leftHandTrajectory = CartesianTrajectory(T, pose, 0.0, endTime);             // Move left hand from current pose to given pose
 		
-		T = this->computer.getWorldTransform("r_hand");                          // Get the current pose of the right hand
-		this->rightHandTrajectory = CartesianTrajectory(T, T, 0.0, endTime);     // Keep the right hand where it is
+		T = this->computer.getWorldTransform("r_hand");                                    // Get the current pose of the right hand
+		this->rightHandTrajectory = CartesianTrajectory(T, T, 0.0, endTime);               // Keep the right hand where it is
 		
 		return true;
 	}
@@ -307,8 +307,8 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &pose, const std::string &
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                   Move both hands to a desired pose                            //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                   Move both hands to a desired pose                           //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand)
 {
@@ -316,52 +316,52 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &leftHand, const iDynTree:
 	return true;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                      Hold the current joint positions                          //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                      Hold the current joint positions                         //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::halt()
 {
-	if(isRunning())	stop();                                                          // Stop any control threads that might be running
-	update_state();                                                                  // Get the current joint state
-	move_to_position(this->q);                                                       // Run the control to stay at current configuration	
+	if(isRunning())	stop();                                                                    // Stop any control threads that might be running
+	update_state();                                                                            // Get the current joint state
+	move_to_position(this->q);                                                                 // Run the control to stay at current configuration	
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                     Testing Cartesian force control                            //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                     Testing Cartesian force control                           //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::force_test()
 {
-	if(isRunning()) stop();                                                          // Stop any control threads that are running
-	this->controlSpace = cartesian;                                                  // Switch to Cartesian control
-	start();                                                                         // Start a new control loop
+	if(isRunning()) stop();                                                                    // Stop any control threads that are running
+	this->controlSpace = cartesian;                                                            // Switch to Cartesian control
+	start();                                                                                   // Start a new control loop
 //	threadInit();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                              This is executed just after 'start()' is called                   //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                              This is executed just after 'start()' is called                  //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::threadInit()
 {
-	this->startTime = yarp::os::Time::now();                                         // Used to regulate the control loop
+	this->startTime = yarp::os::Time::now();                                                   // Used to regulate the control loop
 	return true;
 // 	run();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                       MAIN CONTROL LOOP                                        //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                       MAIN CONTROL LOOP                                       //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::run()
 {
-	update_state();                                                                  // Update the joint state information
-	double elapsedTime = yarp::os::Time::now() - this->startTime;                    // Get elapsed time since start
+	update_state();                                                                            // Update the joint state information
+	double elapsedTime = yarp::os::Time::now() - this->startTime;                              // Get elapsed time since start
 	
-	iDynTree::VectorDynSize tau(this->n);                                            // We want to compute this
+	iDynTree::VectorDynSize tau(this->n);                                                      // We want to compute this
 
 	switch(this->controlSpace)
 	{
 		case joint:
 		{
-			iDynTree::VectorDynSize qddot(this->n);                          // We want to compute this
+			iDynTree::VectorDynSize qddot(this->n);                                    // We want to compute this
 			
 			// Get the desired joint state
 			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n), e(this->n);
@@ -388,16 +388,18 @@ void Humanoid::run()
 			tau = this->generalizedForces.jointTorques();
 			
 			// Variables used in scope
-			iDynTree::Transform x_d;                                           // Desired pose
-			iDynTree::Twist xdot_d;                                            // Desired velocity
-			iDynTree::SpatialAcc xddot_d;                                      // Desired acceleration
-			
+			iDynTree::Transform x_d;                                                   // Desired pose
+			iDynTree::Twist xdot_d;                                                    // Desired velocity
+			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
+
+			print_dynamics();
+/*			
 			// Get the desired state for the left hand
 			std::cout << "So far so good." << std::endl;
 			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);
 			std::cout << "\nHere is the desired position of the left hand:" << std::endl;
 			std::cout << x_d.getPosition().toString() << std::endl;
-/*
+
 			// Compute the gravity compensation
 			this->computer.generalizedGravityForces(this->generalizedForces);
 			tau = this->generalizedForces.jointTorques();
@@ -405,10 +407,10 @@ void Humanoid::run()
 			// Compute the torques from forces at the hand
 			Eigen::MatrixXd J(6, 6 + this->n);
 			this->computer.getFrameFreeFloatingJacobian("l_hand", J);
-			J = J.block(0,6,6,10);                                           // Just the Jacobian for the hand
+			J = J.block(0,6,6,10);                                                     // Just the Jacobian for the hand
 
 			Eigen::VectorXd f(6);
-			f << 0, -2, -2, 0, 0, 0;                                         // Force vector	
+			f << 0, -2, -2, 0, 0, 0;                                                   // Force vector	
 			Eigen::VectorXd temp = J.transpose()*f;
 
 			for(int i = 0; i < 10; i++) tau[i] += temp[i];
@@ -425,25 +427,25 @@ void Humanoid::run()
 //	if(stop()) threadRelease();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                           This is executed just after 'stop()' is called                       //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                           This is executed just after 'stop()' is called                      //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::threadRelease()
 {
-	this->computer.generalizedGravityForces(this->generalizedForces);                // Get the torque needed to withstand gravity
-	send_torque_commands(this->generalizedForces.jointTorques());                    // Send to the robot
+	this->computer.generalizedGravityForces(this->generalizedForces);                          // Get the torque needed to withstand gravity
+	send_torque_commands(this->generalizedForces.jointTorques());                              // Send to the robot
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                  Get the inverse of a matrix                                   //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                  Get the inverse of a matrix                                  //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 {
-	Eigen::JacobiSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeFullU | Eigen::ComputeFullV); // Get the SVD decomposition
-	Eigen::MatrixXd V = SVD.matrixV();                                               // V matrix
-	Eigen::MatrixXd U = SVD.matrixU();                                               // U matrix
-	Eigen::VectorXd s = SVD.singularValues();                                        // Get the singular values
-	Eigen::MatrixXd invA(A.cols(), A.rows()); invA.setZero();                        // Value we want to return
+	Eigen::JacobiSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeFullU | Eigen::ComputeFullV);       // Get the SVD decomposition
+	Eigen::MatrixXd V = SVD.matrixV();                                                         // V matrix
+	Eigen::MatrixXd U = SVD.matrixU();                                                         // U matrix
+	Eigen::VectorXd s = SVD.singularValues();                                                  // Get the singular values
+	Eigen::MatrixXd invA(A.cols(), A.rows()); invA.setZero();                                  // Value we want to return
 	
 	for(int i = 0; i < A.cols(); i++)
 	{
@@ -451,15 +453,15 @@ Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 		{
 			for(int k = 0; k < A.rows(); k++)
 			{
-				if(s(j) >= 1e-04)	invA(i,k) += (V(i,j)*U(k,j))/s(j); // Fast inverse
-//				else			invA(i,k) += 0;                    // Ignore singular directions
+				if(s(j) >= 1e-04)	invA(i,k) += (V(i,j)*U(k,j))/s(j);         // Fast inverse
+//				else			invA(i,k) += 0;                            // Ignore singular directions
 			}
 		}
 	}
 	return invA;
 }
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//			Prints out kinematic values for debugging purposes                        //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //			Prints out kinematic values for debugging purposes                        //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::print_kinematics()
 {		
@@ -500,28 +502,28 @@ void Humanoid::print_kinematics()
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//			Prints out dynamic values for debugging purposes                          //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //			Prints out dynamic values for debugging purposes                          //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::print_dynamics()
 {
 	// Compute the inertia matrix
 	Eigen::MatrixXd M(6+this->n, 6+this->n);
 	this->computer.getFreeFloatingMassMatrix(M);
-	M = M.block(6,6,10,10);                                                          // Just the inertia for the left hand
+	M = M.block(6,6,10,10);                                                                    // Just the inertia for the left hand
 	std::cout << "\nHere is the inertia matrix:" << std::endl;
 	std::cout << M << std::endl;
 	
-	Eigen::MatrixXd invM = inverse(M);                                               // As it says on the label
+	Eigen::MatrixXd invM = inverse(M);                                                         // As it says on the label
 	std::cout << "\nHere is the inverse of the inertia matrix:" << std::endl;
 	std::cout << invM << std::endl;
 	std::cout << "\nHere is the inertia matrix by its inverse:" << std::endl;
-	std::cout << M*invM << std::endl;                                                // Check that it's identity
+	std::cout << M*invM << std::endl;                                                          // Check that it's identity
 	
-	Eigen::MatrixXd J(6, 6+this->n);                                                 // Jacobian matrix
-	this->computer.getFrameFreeFloatingJacobian("l_hand", J);                        // Get the Jacobian to the left hand
-	J = J.block(0,6,6,10);                                                           // Remove the floating base component
-	Eigen::MatrixXd A = inverse(J*invM*J.transpose());                               // Cartesian inertia matrix of the left hand
+	Eigen::MatrixXd J(6, 6+this->n);                                                           // Jacobian matrix
+	this->computer.getFrameFreeFloatingJacobian("l_hand", J);                                  // Get the Jacobian to the left hand
+	J = J.block(0,6,6,10);                                                                     // Remove the floating base component
+	Eigen::MatrixXd A = inverse(J*invM*J.transpose());                                         // Cartesian inertia matrix of the left hand
 	std::cout << "\nHere is the Cartesian inertia matrix:" << std::endl;
 	std::cout << A << std::endl;
 	

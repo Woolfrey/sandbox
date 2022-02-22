@@ -1,15 +1,15 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                   //
-//                         A minimum jerk trajectory between two points in space                    //
-//                                                                                                 //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+   //                                                                                                //
+  //                         A minimum jerk trajectory between two points in space                  //
+ //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef QUINTIC_H_
 #define QUINTIC_H_
 
-#include <iostream>                                                                      // std::cin, std::cout, std::cerr
-#include <iDynTree/Core/VectorDynSize.h>                                                 // iDynTree::VectorDynSize
-#include <math.h>                                                                        // pow(x,n)
+#include <iostream>                                                                                // std::cin, std::cout, std::cerr
+#include <iDynTree/Core/VectorDynSize.h>                                                           // iDynTree::VectorDynSize
+#include <math.h>                                                                                  // pow(x,n)
 
 class Quintic
 {
@@ -27,16 +27,16 @@ class Quintic
 			       const double &time);
 	
 	private:
-		bool isNotValid = false;                                                 // Will not do any computations if there is a problem
-		double a, b, c;                                                          // Polynomial coefficients
-		double t1, t2;                                                           // Start time and end time for the trajectory
-		iDynTree::VectorDynSize p1, p2;                                          // Start point and end point
-		int m;                                                                   // Number of dimensions
+		bool isNotValid = false;                                                           // Will not do any computations if there is a problem
+		double a, b, c;                                                                    // Polynomial coefficients
+		double t1, t2;                                                                     // Start time and end time for the trajectory
+		iDynTree::VectorDynSize p1, p2;                                                    // Start point and end point
+		int m;                                                                             // Number of dimensions
 		
-};                                                                                       // Semicolon needed after class declaration
+};                                                                                                 // Semicolon needed after class declaration
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//					Constructor                                                //
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                        Constructor                                             //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
                  const iDynTree::VectorDynSize &endPoint,
@@ -75,8 +75,8 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 	}	
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//		         Return the desired state for a given time                                 //
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                        Return the desired state for a given time                               //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool Quintic::get_state(iDynTree::VectorDynSize &pos,
                         iDynTree::VectorDynSize &vel,
@@ -97,17 +97,17 @@ bool Quintic::get_state(iDynTree::VectorDynSize &pos,
 		std::cerr 	<< "[ERROR] [QUINTIC] get_state() : Could not obtain the desired state from this object. "
 				<< "Check that it was constructed correctly." << std::endl;
 				
-		pos = this->p1;                                                          // Remain at the start
-		vel.zero(); acc.zero();	                                                 // Don't move
+		pos = this->p1;                                                                    // Remain at the start
+		vel.zero(); acc.zero();	                                                           // Don't move
 		return false;
 	}
 	else
 	{
 		// Determine the elapsed time
 		double dt;
-		if(time < this->t1) 		dt = 0.0;                                // Remain at start
-		else if(time < this->t2) 	dt = time - this->t1;                    // Somewhere in the middle
-		else				dt = this->t2 - this->t1;                // Remain at end
+		if(time < this->t1) 		dt = 0.0;                                          // Remain at start
+		else if(time < this->t2) 	dt = time - this->t1;                              // Somewhere in the middle
+		else				dt = this->t2 - this->t1;                          // Remain at end
 		
 		// Compute the coefficients for interpolating along the trajectory
 		double s =  	this->a*pow(dt,5) +    this->b*pow(dt,4) +   this->c*pow(dt,3);

@@ -1,17 +1,17 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                   //
-//                   A minimum acceleration trajectory across 3 or more points                      //
-//                                                                                                 //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+   //                                                                                                //
+  //                   A minimum acceleration trajectory across 3 or more points                    //
+ //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef CUBIC_H_
 #define CUBIC_H_
 
-#include <iDynTree/Core/MatrixDynSize.h>                                                 // iDynTree::MatrixDynSize
-#include <iDynTree/Core/VectorDynSize.h>                                                 // iDynTree::VectorDynSize
-#include <iostream>                                                                      // std::cerr << "lol" << std::endl;
-#include <math.h>                                                                        // pow(x,n)
-#include <vector>                                                                        // std::vector
+#include <iDynTree/Core/MatrixDynSize.h>                                                           // iDynTree::MatrixDynSize
+#include <iDynTree/Core/VectorDynSize.h>                                                           // iDynTree::VectorDynSize
+#include <iostream>                                                                                // std::cerr << "lol" << std::endl;
+#include <math.h>                                                                                  // pow(x,n)
+#include <vector>                                                                                  // std::vector
 
 class Cubic
 {
@@ -28,19 +28,19 @@ class Cubic
 		
 	protected: // CubicRotation class can access these
 	
-		bool isNotValid = true;                                                  // Won't do any interpolation if this is true
-		int m, n;                                                                // m dimensions across n waypoints (for n-1 splines)
-		std::vector<double> t;                                                   // Time to reach each waypoint
-		std::vector<std::vector<double>> a, b, c, d;                             // Spline coefficients
-};                                                                                       // Semicolon needed after a class declaration
+		bool isNotValid = true;                                                            // Won't do any interpolation if this is true
+		int m, n;                                                                          // m dimensions across n waypoints (for n-1 splines)
+		std::vector<double> t;                                                             // Time to reach each waypoint
+		std::vector<std::vector<double>> a, b, c, d;                                       // Spline coefficients
+};                                                                                                 // Semicolon needed after a class declaration
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                     Basic constructor                                           //
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                     Basic constructor                                          //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points,
              const std::vector<double> &times) :
-	     m(points[0].size()),                                                        // Number of dimensions
-	     n(points.size()),                                                           // Number of waypoints
+	     m(points[0].size()),                                                                  // Number of dimensions
+	     n(points.size()),                                                                     // Number of waypoints
 	     t(times)
 {
 	// Check that the input dimensions are sound
@@ -71,7 +71,7 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points,
 		this->d.resize(this->m);
 	
 		// 2 waypoints, only 1 spline
-		if(this->n == 2)                                                         // n - 1 = 1 spline
+		if(this->n == 2)                                                                   // n - 1 = 1 spline
 		{	
 			float dt = this->t[1] - this->t[0];
 			for(int i = 0; i < this->m; i++)
@@ -80,8 +80,8 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points,
 				// a, b, c, d, are stored as m dimensions across n waypoints
 				a[i].push_back(-2*(points[1][i] - points[0][i])/pow(dt,3));
 				b[i].push_back(3*(points[1][i] - points[0][i])/pow(dt,2));
-				c[i].push_back(0);                                       // Start velocity
-				d[i].push_back(points[0][i]);                            // Start position
+				c[i].push_back(0);                                                 // Start velocity
+				d[i].push_back(points[0][i]);                                      // Start position
 			}
 		}
 		// More than 1 waypoint, need to enforce continuity across waypoints
@@ -120,35 +120,35 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points,
 				B(i,i+1) = 1/dt2;
 			}
 			
-//			iDynTree::MatrixDynSize C = A.inverse()*B;                       // Makes calcs a little easier
-			iDynTree::VectorDynSize sdd(this->n), s(this->n);                // A*sdd = B*s ---> sdd = C*s
+//			iDynTree::MatrixDynSize C = A.inverse()*B;                                 // Makes calcs a little easier
+			iDynTree::VectorDynSize sdd(this->n), s(this->n);                          // A*sdd = B*s ---> sdd = C*s
 			double ds, dt;
 			for(int i = 0; i < this->m; i++)
 			{
 				// NOTE: points is stores as n waypoints each with m dimensions
 				// whereas a, b, c, d are m dimensions across n waypoints
-				for(int j = 0; j < this->n; j++) s[j] = points[j][i];    // Get the jth waypoint for the ith dimension
-//				sdd = C*s;                                               // Compute the coefficients
+				for(int j = 0; j < this->n; j++) s[j] = points[j][i];              // Get the jth waypoint for the ith dimension
+//				sdd = C*s;                                                         // Compute the coefficients
 				
-				for(int j = 0; j < this->n-1; j++)                       // Compute coefficients for the n-1 splines
+				for(int j = 0; j < this->n-1; j++)                                 // Compute coefficients for the n-1 splines
 				{
 					dt = this->t[j+1] - this->t[j];
 					ds = s[j+1] - s[j];
 							
 					this->a[i].push_back((sdd[j+1] - sdd[j])/(6*dt));
 					this->b[i].push_back((sdd[j]/2));			
-					if(j == 0)		this->c[i].push_back(0); // Starting velocity of zero for first spline
+					if(j == 0)		this->c[i].push_back(0);           // Starting velocity of zero for first spline
 					else if(j < this->n-1)	this->c[i].push_back(ds/dt - dt*(sdd[j+1] - 2*sdd[j])/6);
 					else			this->c[i].push_back(dt*(sdd[j+1] + sdd[j])/2);
-					this->d[i].push_back(s[j]);                      // d dictates the start position of the spline
+					this->d[i].push_back(s[j]);                                // d dictates the start position of the spline
 				}
 			}
 		}
 	}
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//                           Get the desired state for the given time                              //
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                           Get the desired state for the given time                             //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool Cubic::get_state(iDynTree::VectorDynSize &pos,
                       iDynTree::VectorDynSize &vel,
@@ -164,22 +164,22 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 		pos.resize(this->m); vel.resize(this->m); acc.resize(this->m);
 		for(int i = 0; i < this->m; i++)
 		{
-			pos[i] = this->d[i][0];                                          // Remain at start
-			vel[i] = 0.0; acc[i] = 0.0;                                      // Don't move
+			pos[i] = this->d[i][0];                                                    // Remain at start
+			vel[i] = 0.0; acc[i] = 0.0;                                                // Don't move
 		}
 		return false;
 	}
 	
 	// Check if the object is valid upon construction
-	else if(this->isNotValid)                                                        // Something wrong with this object
+	else if(this->isNotValid)                                                                  // Something wrong with this object
 	{
 		std::cerr << "[ERROR] [CUBIC] get_state() : Something went wrong during construction of this object. "
 			<< "Cannot return the state." << std::endl;
 				
 		for(int i = 0; i < this->m; i++)
 		{
-			pos[i] = this->d[i][0];                                          // Remain at the start
-			vel[i] = 0.0; acc[i] = 0.0;                                      // Don't move
+			pos[i] = this->d[i][0];                                                    // Remain at the start
+			vel[i] = 0.0; acc[i] = 0.0;                                                // Don't move
 		}
 		return false;
 	}
@@ -191,21 +191,21 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 		{
 			for(int i = 0; i < this->m; i++)
 			{
-				pos[i] = this->d[i][0];                                  // d coefficient dictates start position
-				vel[i] = 0.0;                                            // Don't move
-				acc[i] = 0.0;                                            // Don't accelerate
+				pos[i] = this->d[i][0];                                            // d coefficient dictates start position
+				vel[i] = 0.0;                                                      // Don't move
+				acc[i] = 0.0;                                                      // Don't accelerate
 			}
 		}
 		// Trajectory finished
 		else if(time > this->t.back())
 		{
-			int j = this->n-1;                                               // Start from spline n-1
-			double dt = this->t[n] - this->t[n-1];                           // Interpolate time up to the last waypoint
+			int j = this->n-1;                                                        // Start from spline n-1
+			double dt = this->t[n] - this->t[n-1];                                     // Interpolate time up to the last waypoint
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] = this->a[i][j]*pow(dt,3) + this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
-				vel[i] = 0.0;                                            // Don't move
-				acc[i] = 0.0;                                            // Don't accelerate
+				vel[i] = 0.0;                                                      // Don't move
+				acc[i] = 0.0;                                                      // Don't accelerate
 			}
 		}
 		// Somewhere in between
@@ -215,10 +215,10 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 			int j; double dt;
 			for(int i = 1; i < this->n; i++)
 			{
-				if(time < this->t[i])                                    // Not yet reached the ith waypoint...
+				if(time < this->t[i])                                              // Not yet reached the ith waypoint...
 				{
-					j = i-1;                                         // ... so we must be on spline i-1
-					dt = time - this->t[j];                          // Elapsed time since start of spline i-1
+					j = i-1;                                                   // ... so we must be on spline i-1
+					dt = time - this->t[j];                                    // Elapsed time since start of spline i-1
 				}
 			}
 		
