@@ -78,8 +78,9 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &points,
 			{
 				// Note: points has n vectors with m dimensions, whereas
 				// a, b, c, d, are stored as m dimensions across n waypoints
-				a[i].push_back(-2*(points[1][i] - points[0][i])/pow(dt,3));
-				b[i].push_back(3*(points[1][i] - points[0][i])/pow(dt,2));
+				float dx = points[1][i] - points[0][i];
+				a[i].push_back(-2*dx/pow(dt,3));
+				b[i].push_back(3*dx/pow(dt,2));
 				c[i].push_back(0);                                                 // Start velocity
 				d[i].push_back(points[0][i]);                                      // Start position
 			}
@@ -188,7 +189,8 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 	{
 		// Trajectory not yet started
 		if(time < this->t[0])
-		{
+		{	
+			std::cout << "Time: " << time << " (not yet started)." << std::endl;
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] = this->d[i][0];                                            // d coefficient dictates start position
@@ -200,7 +202,9 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 		else if(time > this->t.back())
 		{
 			int j = this->n-1;                                                        // Start from spline n-1
-			double dt = this->t[n] - this->t[n-1];                                     // Interpolate time up to the last waypoint
+			double dt = this->t[n-1] - this->t[n-2];                                  // Interpolate time up to the last waypoint
+			
+			std::cout << "Time: " << time << " (finished). dt: " << dt << std::endl;
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] = this->a[i][j]*pow(dt,3) + this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
@@ -221,7 +225,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 					dt = time - this->t[j];                                    // Elapsed time since start of spline i-1
 				}
 			}
-		
+			std::cout << "Time: " << time << " (on spline " << j+1 << ")." << std::endl;
 			// Interpolate the state
 			for(int i = 0; i < this->m; i++)
 			{

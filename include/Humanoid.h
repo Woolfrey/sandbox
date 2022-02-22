@@ -7,6 +7,7 @@
 #define HUMANOID_H_
 
 #include <CartesianTrajectory.h>                                                                   // Custom trajectory class
+#include <Cubic.h>
 #include <Eigen/Dense>                                                                             // Eigen::MatrixXd
 #include <Haiku.h>
 #include <iDynTree/KinDynComputations.h>                                                           // Class that does inverse dynamics calculations
@@ -88,7 +89,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		// Joint Control
 		double Kq = 50;                                                                    // Proportional gain
 		double Kd = 3.0;                                                                   // Derivative gain
-		Quintic jointTrajectory;                                                           // Joint level control
+		Cubic jointTrajectory;                                                           // Joint level control
 		
 		// Cartesian Control
 		CartesianTrajectory leftHandTrajectory, rightHandTrajectory;                       // Internal Cartesian trajectory generatory
@@ -227,22 +228,27 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	}
 	else
 	{
+
 		if(isRunning()) stop();                                                            // Stop any control threads that are running
 		this->controlSpace = joint;                                                        // Set the control space		
 		iDynTree::VectorDynSize desired = this->q;                                         // Assign as current joint state, override later...
 				
 		// Ensure that the target is within joint limits
 		bool warning = false;
+		std::vector<int> jointNum;                                                         // Store which joints violate limits
+		
 		for(int i = 0; i < position.size(); i++)
 		{
 			if(position[i] >= this->qMax[i])
 			{
 				desired[i] = this->qMax[i] - 0.001;                                // Just below the limit
+				jointNum.push_back(i);                                             // Add to list
 				warning = true;
 			}
 			else if(position[i] <= this->qMin[i])
 			{
 				desired[i] = this->qMin[i] + 0.001;                                // Just above the limit
+				jointNum.push_back(i);                                             // Add to list
 				warning = true;
 			}
 			else	desired[i] = position[i];                                          // Override position
@@ -250,10 +256,12 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 		
 		if(warning)
 		{
-			std::cerr << "[WARNING] [HUMANOID] move_to_position() : Target joint configuration outside of "
-			          << "one or more joint limits. Target has been automatically overidden." << std::endl;
+			std::cerr << "[WARNING] [HUMANOID] move_to_position() : The target positions for the following "
+				  << "joints were outside limits: ";
+			for(int i = 0; i < jointNum.size(); i++) std::cout << " Joint No.: " << jointNum[i] << " Target: " << position[i] << ". ";
+			std::cout << "Values were automatically overridden." << std::endl;
 		}
-		
+/*		
 		// Compute optimal time scaling
 		double dt, dq;
 		double endTime = 2.0;
@@ -264,7 +272,15 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 			if(dt > endTime) endTime = dt;                                             // If slowes time so far, override
 		}
 		
-		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);                     // Create new joint trajectory
+//		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);                     // Create new joint trajectory
+*/
+		std::vector<iDynTree::VectorDynSize> points;
+		points.push_back(this->q);
+		points.push_back(position);
+		std::vector<double> times;
+		times.push_back(0.0);
+		times.push_back(2.0);
+		this->jointTrajectory = Cubic(points,times);
 		
 		start();                                                                           // Go immediately to threadInit()
 		
@@ -364,7 +380,7 @@ void Humanoid::run()
 			iDynTree::VectorDynSize qddot(this->n);                                    // We want to compute this
 			
 			// Get the desired joint state
-			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n), e(this->n);
+			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
 			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
 			
 			// Compute the feedforward + feedback control for the joint acceleration
@@ -372,6 +388,8 @@ void Humanoid::run()
 			{
 				qddot[i] = qddot_d[i] + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]);
 			}
+			
+//			std::cout << q_d.toString() << std::endl;
 			
 			// Compute the inverse dynamics from the joint accelerations
 			iDynTree::Vector6 baseAcc; baseAcc.zero();                                       // Don't move the base
