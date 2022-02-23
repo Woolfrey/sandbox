@@ -73,9 +73,10 @@ class Humanoid : public yarp::os::PeriodicThread,
 		iDynTree::Vector6 get_pose_error(const iDynTree::Transform &desired, const iDynTree::Transform &actual);
 		
 		// Control Functions
-		bool update_state();	
-		bool move_to_position(const iDynTree::VectorDynSize &position);
-		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);
+		bool update_state();                                                               // Update the joint states
+		bool move_to_position(const iDynTree::VectorDynSize &position);                    // Move to a desired configuration
+		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &position);      // Move through several joint configurations
+		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);  // Move one hand to a desired pose
 		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
 		void halt();                                                                       // Stop any control and maintain current position
 		void force_test();							          
@@ -186,7 +187,6 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
                                            const iDynTree::Transform &actual)
 {
 	iDynTree::Vector6 error;                                                                   // Value to be returned
-	
 	return error;
 }
 
@@ -228,7 +228,6 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	}
 	else
 	{
-
 		if(isRunning()) stop();                                                            // Stop any control threads that are running
 		this->controlSpace = joint;                                                        // Set the control space		
 		iDynTree::VectorDynSize desired = this->q;                                         // Assign as current joint state, override later...
@@ -284,6 +283,52 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 		
 		return true;
 	}
+}
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                    Move the joints through several desired configurations                     //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &targets)
+{
+	std::vector<double> times; times.push_back(0);                                             // No delay when starting control loop
+	std::vector<iDynTree::VectorDynSize> points; points.push_back(this->q);                    // First waypoint is current joint configuration
+	std::vector<int> violation;                                                                // Store joint violations to warn user
+	for(int i = 0; i < targets.size(); i++)
+	{
+		if(targets[i].size() != this->n)
+		{
+			std::cerr << "[ERROR] [HUMANOID] move_to_positions() : Input vector has " << points.size() 
+				  << " element(s), but there are " << this->n << " joints in this model." << std::endl;
+			return false;
+		}
+		else
+		{
+			double dt = 2.0;
+			points.push_back(targets[i]);                                               // Add the next waypoint
+			for(int j = 0; j < this->n; j++)
+			{
+				// Enforce position limits
+				if(targets[i][j] < this->qMin[j])
+				{
+					points[i+1][j] = this->qMin[j] + 0.001;                 // Just above the joint limit
+					violation.push_back(j);
+				}
+				else if(targets[i][j] > this->qMax[j])
+				{
+					points[i+1][j] = this->qMax[j] - 0.001;                 // Just below the joint limit
+					violation.push_back(j);
+				}
+				
+				// Do some time scaling for speed limits
+				double dq = abs(points[i+1][j] - points[i][j]);                	   // Distance between waypoints
+				if(dt < 1.5*dq/this->vLim[j]) dt = 1.5*dq/this->vLim[j];           // Make average speed 150% of max velocity
+			}
+			times.push_back(dt);                                                        // Add the time for the waypoint
+		}
+	}
+	this->jointTrajectory = Cubic(points, times);
+	start();
+	return true;
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
