@@ -89,7 +89,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		// Joint Control
 		double Kq = 50;                                                                    // Proportional gain
 		double Kd = 3.0;                                                                   // Derivative gain
-		Cubic jointTrajectory;                                                           // Joint level control
+		Cubic jointTrajectory;                                                             // Joint level control
 		
 		// Cartesian Control
 		CartesianTrajectory leftHandTrajectory, rightHandTrajectory;                       // Internal Cartesian trajectory generatory
@@ -261,25 +261,23 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 			for(int i = 0; i < jointNum.size(); i++) std::cout << " Joint No.: " << jointNum[i] << " Target: " << position[i] << ". ";
 			std::cout << "Values were automatically overridden." << std::endl;
 		}
-/*		
-		// Compute optimal time scaling
-		double dt, dq;
-		double endTime = 2.0;
+		
+		// Compute "optimal" time scaling (really a heuristic method; true optimal method requires too much math)
+		double dt = 2.0;
+		double dq;
 		for(int i = 0; i < this->n; i++)
 		{
 			dq = abs(desired[i] - this->q[i]);                                         // Distance to target
-			if(dq > 0) dt = (15*dq)/(8*this->vLim[i]);                                 // Time to reach target at peak velocity
-			if(dt > endTime) endTime = dt;                                             // If slowes time so far, override
+			if(dt < 1.5*dq/this->vLim[i]) dt = 2*dq/this->vLim[i];                     // Average velocity >= speed limit
 		}
-		
-//		this->jointTrajectory = Quintic(this->q, desired, 0, endTime);                     // Create new joint trajectory
-*/
+
+		// Put data in to vectors and pass to Cubic trajectory object
 		std::vector<iDynTree::VectorDynSize> points;
 		points.push_back(this->q);
 		points.push_back(position);
 		std::vector<double> times;
 		times.push_back(0.0);
-		times.push_back(2.0);
+		times.push_back(dt);
 		this->jointTrajectory = Cubic(points,times);
 		
 		start();                                                                           // Go immediately to threadInit()
