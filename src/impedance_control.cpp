@@ -15,15 +15,6 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-	// Convert from degrees to radians
-	for(int i = 0; i < home.size(); i++)
-	{
-		home[i]    *= M_PI/180;
-		receive[i] *= M_PI/180;
-		shake[i]   *= M_PI/180;
-		wave[i]    *= M_PI/180;
-	}
-
 	// Default for argc is 1, but I don't know why ¯\_(ツ)_/¯
 	if(argc != 2)									
 	{
@@ -96,6 +87,10 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
+				std::vector<iDynTree::VectorDynSize> positions;
+				positions.push_back(iDynTree::VectorDynSize(wave));
+				positions.push_back(iDynTree::VectorDynSize(home));
+				robot.move_to_positions(positions);
 				output.addString("Cosa");
 			}
 			
