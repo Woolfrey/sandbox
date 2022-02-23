@@ -190,7 +190,6 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 		// Trajectory not yet started
 		if(time < this->t[0])
 		{	
-			std::cout << "Time: " << time << " (not yet started)." << std::endl;
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] = this->d[i][0];                                            // d coefficient dictates start position
@@ -201,10 +200,9 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 		// Trajectory finished
 		else if(time > this->t.back())
 		{
-			int j = this->n-1;                                                        // Start from spline n-1
+			int j = this->n-2;                                                        // Start from spline n-1 (code indexing is weird)
 			double dt = this->t[n-1] - this->t[n-2];                                  // Interpolate time up to the last waypoint
 			
-			std::cout << "Time: " << time << " (finished). dt: " << dt << std::endl;
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] = this->a[i][j]*pow(dt,3) + this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
@@ -225,7 +223,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos,
 					dt = time - this->t[j];                                    // Elapsed time since start of spline i-1
 				}
 			}
-			std::cout << "Time: " << time << " (on spline " << j+1 << ")." << std::endl;
+			
 			// Interpolate the state
 			for(int i = 0; i < this->m; i++)
 			{
