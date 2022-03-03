@@ -58,13 +58,6 @@ int main(int argc, char *argv[])
 				robot.move_to_position(iDynTree::VectorDynSize(home));
 				output.addString("Casa");
 			}
-			else if(command == "left")
-			{
-				iDynTree::Transform T = robot.get_hand_pose("left");               // Pose of the left hand
-				iDynTree::Position p = T.getPosition();                            // Extract the position component
-				T.setPosition(p + iDynTree::Position(0, 0.1, 0));                  // Offset it by a tiny bit
-				robot.move_to_pose(T, "left");                                     // Move the left hand to the given pose
-			}
 			else if(command == "receive")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(receive));
