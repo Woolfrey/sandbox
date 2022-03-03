@@ -75,21 +75,22 @@ class Humanoid : public yarp::os::PeriodicThread,
 		// Control Functions
 		bool update_state();                                                               // Update the joint states
 		bool move_to_position(const iDynTree::VectorDynSize &position);                    // Move to a desired configuration
-		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &position);      // Move through several joint configurations
-		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);  // Move one hand to a desired pose
-		bool move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand);
+		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions);     // Move through several joint configurations
+		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions,
+		                       const std::vector<double> &times);
 		void halt();                                                                       // Stop any control and maintain current position
 		void force_test();							          
 		
 	private:
 		bool isValid = true;                                                               // Will not do computations if true
-		enum ControlSpace {joint, cartesian, dual} controlSpace;
+		double dt = 0.01;                                                                  // Discrete time step
+		enum ControlSpace {joint, cartesian, dual} controlSpace;                           // Switch cases
 		
-		iDynTree::FreeFloatingGeneralizedTorques generalizedForces;                        // Forces and torques
+		iDynTree::FreeFloatingGeneralizedTorques generalForces;                            // Forces and torques
 		
 		// Joint Control
 		double Kq = 50;                                                                    // Proportional gain
-		double Kd = 3.0;                                                                   // Derivative gain
+		double Kd = 5.0;                                                                   // Derivative gain
 		Cubic jointTrajectory;                                                             // Joint level control
 		
 		// Cartesian Control
@@ -135,23 +136,25 @@ Humanoid::Humanoid(const std::string &fileName) :
 	// Load a model
 	iDynTree::ModelLoader loader;                                                              // Temporary
 
-	if(!loader.loadReducedModelFromFile(fileName, jointList, "urdf"))
+	if(not loader.loadReducedModelFromFile(fileName, jointList, "urdf"))
 	{
-		std::cerr << "[ERROR] [HUMANOID] Constructor: Could not load model from path " << fileName << std::endl;
+		std::cerr << "[ERROR] [HUMANOID] Constructor: "
+		          << "Could not load model from path " << fileName << std::endl;
 		this->isValid = false;
 	}
 	else
 	{
-		if(!this->computer.loadRobotModel(loader.model()))
+		if(not this->computer.loadRobotModel(loader.model()))
 		{
-			std::cerr << "[ERROR] [HUMANOID] Constructor : Could not generate iDynTree::KinDynComputations "
-			          << "class from given model: " << loader.model().toString() << std::endl;
+			std::cerr << "[ERROR] [HUMANOID] Constructor: "
+			          << "Could not generate iDynTree::KinDynComputations class from given model: "
+			          << loader.model().toString() << std::endl;
 		}
 		else
 		{
 			this->model = computer.model();                                            // Get the model from the computer
 			this->n = model.getNrOfDOFs();                                             // Degrees of freedom / number of joints
-			this->generalizedForces.resize(this->model);                               // Restructure force class to match model
+			this->generalForces.resize(this->model);                               // Restructure force class to match model
 			
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 	
@@ -160,7 +163,8 @@ Humanoid::Humanoid(const std::string &fileName) :
 			{
 				move_to_position(iDynTree::VectorDynSize(startConfiguration));
 			}
-			else	std::cerr << "[ERROR] [HUMANOID] Constructor: Could not activate joint control." << std::endl;
+			else	std::cerr << "[ERROR] [HUMANOID] Constructor: "
+			                  << "Could not activate joint control." << std::endl;
 		}
 	}
 }
@@ -174,8 +178,9 @@ iDynTree::Transform Humanoid::get_hand_pose(const std::string &whichHand)
 	else if(whichHand == "right") return this->computer.getWorldTransform("r_hand");
 	else
 	{
-		std::cerr << "[ERROR] [HUMANOID] get_hand_pose() : String input was " << whichHand
-			  << " but expected 'left' or 'right' as an argument. Returning left hand pose by default." << std::endl;
+		std::cerr << "[ERROR] [HUMANOID] get_hand_pose():"
+		          << "String input was " << whichHand << " but expected 'left' or 'right' as an argument. "
+		          << "Returning left hand pose by default." << std::endl;
 		return this->computer.getWorldTransform("l_hand");
 	}
 }
@@ -203,180 +208,190 @@ bool Humanoid::update_state()
 		}
 		else
 		{
-			std::cerr << "[ERROR] [HUMANOID] update_state() : Could not set state for the "
-			          << " iDynTree::iKinDynComputations object." << std::endl;
+			std::cerr << "[ERROR] [HUMANOID] update_state(): "
+			          << "Could not set state for the iDynTree::iKinDynComputations object." << std::endl;
 			return false;
 		}
 	}
 	else
 	{
-		std::cerr << "[ERROR] [HUMANOID] update_state() : Could not update state from the JointInterface class." << std::endl;
+		std::cerr << "[ERROR] [HUMANOID] update_state(): "
+		          << "Could not update state from the JointInterface class." << std::endl;
 		return false;
 	}
 }
 
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                             Move the joints to a desired configuration                        //
+ //          Move the joints to a desired configuration (optimal time solved automatically)       //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 {
-	if(position.size() > this->n)
+	if(position.size() != this->n)
 	{
-		std::cerr << "[ERROR] [HUMANOID] move_to_position() : Input vector has " << position.size() 
-		          << " elements, but there are only " << this->n << " joints in this model." << std::endl;
+		std::cerr << "[ERROR] [HUMANOID] move_to_position(): "
+			  << "Position vector had " << position.size() << " elements, "
+			  << "but this model has " << this->n << " joints." << std::endl;
 		return false;
 	}
 	else
 	{
-		if(isRunning()) stop();                                                            // Stop any control threads that are running
-		this->controlSpace = joint;                                                        // Set the control space		
-		iDynTree::VectorDynSize desired = this->q;                                         // Assign as current joint state, override later...
-				
-		// Ensure that the target is within joint limits
-		bool warning = false;
-		std::vector<int> jointNum;                                                         // Store which joints violate limits
-		
-		for(int i = 0; i < position.size(); i++)
-		{
-			if(position[i] >= this->qMax[i])
-			{
-				desired[i] = this->qMax[i] - 0.001;                                // Just below the limit
-				jointNum.push_back(i);                                             // Add to list
-				warning = true;
-			}
-			else if(position[i] <= this->qMin[i])
-			{
-				desired[i] = this->qMin[i] + 0.001;                                // Just above the limit
-				jointNum.push_back(i);                                             // Add to list
-				warning = true;
-			}
-			else	desired[i] = position[i];                                          // Override position
-		}
-		
-		if(warning)
-		{
-			std::cerr << "[WARNING] [HUMANOID] move_to_position() : The target positions for the following "
-				  << "joints were outside limits: ";
-			for(int i = 0; i < jointNum.size(); i++) std::cout << " Joint No.: " << jointNum[i] << " Target: " << position[i] << ". ";
-			std::cout << "Values were automatically overridden." << std::endl;
-		}
-		
-		// Compute "optimal" time scaling (really a heuristic method; true optimal method requires too much math)
-		double dt = 2.0;
-		double dq;
+		double t = 2.0;
 		for(int i = 0; i < this->n; i++)
 		{
-			dq = abs(desired[i] - this->q[i]);                                         // Distance to target
-			if(dt < 1.5*dq/this->vLim[i]) dt = 2*dq/this->vLim[i];                     // Average velocity >= speed limit
+			double dq = abs(position[i] - this->q[i]);                                 // Distance to target from current joint position
+			double tf = (3*dq)/(2*this->vLim[i]);                                      // Time to reach target at max speed
+			
+			if(tf > t) t = tf;                                                         // Override if previous time is too fast
 		}
-
-		// Put data in to vectors and pass to Cubic trajectory object
-		std::vector<iDynTree::VectorDynSize> points;
-		points.push_back(this->q);
-		points.push_back(position);
-		std::vector<double> times;
-		times.push_back(0.0);
-		times.push_back(dt);
-		this->jointTrajectory = Cubic(points,times);
 		
-		start();                                                                           // Go immediately to threadInit()
-		
-		return true;
+		std::vector<double> time; time.push_back(t);                                       // Add time to a vector object
+		std::vector<iDynTree::VectorDynSize> target; target.push_back(position);           // Add position to a vector object
+		return move_to_positions(target, time);                                            // Call the main joint control function
 	}
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                    Move the joints through several desired configurations                     //
+ //           Move the joints to several desired configurations (times solved automatically)      //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &targets)
+bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions)
 {
-	std::vector<double> times; times.push_back(0);                                             // No delay when starting control loop
-	std::vector<iDynTree::VectorDynSize> points; points.push_back(this->q);                    // First waypoint is current joint configuration
-	std::vector<int> violation;                                                                // Store joint violations to warn user
-	for(int i = 0; i < targets.size(); i++)
+	bool OK = true;
+	
+	// Check the input dimensions are sound
+	for(int i = 0; i < positions.size(); i++)
 	{
-		if(targets[i].size() != this->n)
+		if(positions[i].size() != this->n)
 		{
-			std::cerr << "[ERROR] [HUMANOID] move_to_positions() : Input vector has " << points.size() 
-				  << " element(s), but there are " << this->n << " joints in this model." << std::endl;
-			return false;
+			std::cerr << "[ERROR] [HUMANOID] move_to_positions(): "
+				  << "Position vector " << i+1 << " had " << positions[i].size()
+				  << " elements but this model has " << this->n << " joints." << std::endl;
+			OK = false;
 		}
-		else
+	}
+	
+	if(OK)
+	{
+		std::vector<double> times;                                                         // We need to solve for this
+		
+		// Solve an "optimal" time
+		for(int i = 0; i < positions.size()-1; i++)
 		{
-			double dt = 2.0;
-			points.push_back(targets[i]);                                               // Add the next waypoint
+			double t = 2.0;                                                           // Default time
 			for(int j = 0; j < this->n; j++)
 			{
-				// Enforce position limits
-				if(targets[i][j] < this->qMin[j])
-				{
-					points[i+1][j] = this->qMin[j] + 0.001;                 // Just above the joint limit
-					violation.push_back(j);
-				}
-				else if(targets[i][j] > this->qMax[j])
-				{
-					points[i+1][j] = this->qMax[j] - 0.001;                 // Just below the joint limit
-					violation.push_back(j);
-				}
+				double dq;
+				if(i == 0) dq = abs(positions[i][j] - this->q[j]);                 // Distance from current joint positions          
+				else       dq = abs(positions[i][j] - positions[i-1][j]);          // Distance from previous waypoint
 				
-				// Do some time scaling for speed limits
-				double dq = abs(points[i+1][j] - points[i][j]);                	   // Distance between waypoints
-				if(dt < 1.5*dq/this->vLim[j]) dt = 1.5*dq/this->vLim[j];           // Make average speed 150% of max velocity
+				double tMin = (3*dq)/(2*this->vLim[j]);                            // Minimum time if average speed is 66% of max
+				
+				if(tMin > t) t = tMin;                                             // Override if its the largest so far
 			}
-			times.push_back(dt);                                                        // Add the time for the waypoint
+			
+			if(i == 0) times.push_back(t);                                             // Assume we start from time t = 0
+			else       times.push_back(times[i-1] + t);                                // Increment the previous time
 		}
+		
+		return move_to_positions(positions,times);                                         // Call the full joint control function
 	}
-	this->jointTrajectory = Cubic(points, times);
-	start();
-	return true;
+	else return false;
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                                   Move one hand to a desired pose                             //
+ //                Move the joints to several desired configurations (times given)                //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool Humanoid::move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand)
+bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions, const std::vector<double> &times)
 {
-	if(whichHand == "left")
+	bool OK = true;
+	
+	// Check that the number of waypoints is equal to the number of times
+	if(positions.size() != times.size())
 	{
-		if(isRunning()) stop();                                                            // Stop any control threads that are running
-		this->controlSpace = cartesian;                                                    // Switch to Cartesian control
-		
-		// TO DO: CHECK THE POSE IS WITHIN THE WORKSPACE
-		// TO DO: COMPUTE AN 'OPTIMAL' TRAJECTORY TIME
-		double endTime = 5.0;
-
-		iDynTree::Transform T = this->computer.getWorldTransform("l_hand");                // Get the current pose of the left hand
-		this->leftHandTrajectory = CartesianTrajectory(T, pose, 0.0, endTime);             // Move left hand from current pose to given pose
-		
-		T = this->computer.getWorldTransform("r_hand");                                    // Get the current pose of the right hand
-		this->rightHandTrajectory = CartesianTrajectory(T, T, 0.0, endTime);               // Keep the right hand where it is
-		
-		return true;
-	}
-	else if(whichHand == "right")
-	{
-		haiku();
-		return true;
+		std::cout << "[ERROR] [HUMANOID] move_to_positions(): "
+			  << "Position vector had " << positions.size() << " waypoints, "
+			  << "times had " << times.size() << " elements." << std::endl;
+		OK = false;
 	}
 	else
 	{
-		std::cerr << "[ERROR] [HUMANOID] move_to_pose(): String argument was " << whichHand
-		          << " but expected 'left' or 'right' as an input." << std::endl;
-		return false;
+		// Check the time vector is in order
+		for(int i = 0; i < times.size()-1; i++)
+		{
+			if(times[i] == times[i+1])
+			{
+				std::cerr << "[ERROR] [HUMANOID] move_to_positions(): "
+					  << "Time " << i+1 << " and time " << i+2 << " are the same! "
+					  << "(" << times[i] << " seconds). Cannot move in zero time." << std::endl;
+				OK = false;
+			}
+			else if(times[i] > times[i+1])
+			{
+				std::cerr << "[ERROR] [HUMANOID] move_to_positions(): "
+					  << "Times are not in ascending order. Time " << i+1 << " was "
+					  << times[i] << " seconds and time " << i+2 << " was "
+					  << times[i+1] << " seconds." << std::endl;
+				OK = false;
+			}
+		}
+		
+		// Check that the number of dimensions are correct
+		for(int i = 0; i < positions.size(); i++)
+		{
+			if(positions[i].size() != this->n)
+			{
+				std::cerr << "[ERROR] [HUMANOID] move_to_positions(): "
+					  << "Position vector " << i+1 << " had " << positions[i].size()
+					  << " elements but this model has " << this->n << " joints." << std::endl;
+				OK = false;
+			}
+		}
 	}
+	
+	if(OK)
+	{
+		// Transfer the points and cap them if they are outside joint limits
+		std::vector<iDynTree::VectorDynSize> waypoint; waypoint.push_back(this->q);        // Use current joint position as first waypoint
+		std::vector<double> t; t.push_back(0.0);                                           // Start time of zero
+		
+		for(int i = 0; i < positions.size(); i++)
+		{
+			waypoint.push_back(positions[i]);                                          // Add position to end of vector
+			t.push_back(times[i]);
+			for(int j = 0; j < this->n; j++)
+			{
+				if(waypoint[i+1][j] < this->qMin[j])
+				{
+					waypoint[i+1][j] = this->qMin[j] + 0.001;                 // Just above the lower limit
+					
+					std::cout << "[WARNING] [HUMANOID] move_to_positions() "
+						  << "Target position for joint " << j << " of "
+						  << positions[i][j] << " was below the joint limit." << std::endl;
+				}
+				else if(waypoint[i+1][j] > this->qMax[j])
+				{
+					waypoint[i+1][j] = this->qMax[j] - 0.001;                  // Just below the lower limit
+					
+					std::cout << "[WARNING] [HUMANOID] move_to_position() "
+						  << "Target position for joint " << j << " of "
+						  << positions[i][j] << " was above the joint limit." << std::endl;
+				}
+			}
+		}
+		
+		if(isRunning()) stop();                                                            // Stop any control threads that are running
+		this->controlSpace = joint;                                                        // Switch to joint control mode
+		this->jointTrajectory = Cubic(waypoint,t);                                         // New Cubic spline trajectory
+		start();                                                                           // Start the control loop
+//		threadInit(); (this line is automatically executed when start() is called)
+
+		return true;
+	}
+	else return false;
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                                   Move both hands to a desired pose                           //
-///////////////////////////////////////////////////////////////////////////////////////////////////
-bool Humanoid::move_to_pose(const iDynTree::Transform &leftHand, const iDynTree::Transform &rightHand)
-{
-	haiku();
-	return true;
-}
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                                      Hold the current joint positions                         //
+ //                               Hold the current joint positions                                //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::halt()
 {
@@ -393,7 +408,7 @@ void Humanoid::force_test()
 	if(isRunning()) stop();                                                                    // Stop any control threads that are running
 	this->controlSpace = cartesian;                                                            // Switch to Cartesian control
 	start();                                                                                   // Start a new control loop
-//	threadInit();
+//	threadInit(); (this line is automatically executed when start() is called)
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -403,7 +418,7 @@ bool Humanoid::threadInit()
 {
 	this->startTime = yarp::os::Time::now();                                                   // Used to regulate the control loop
 	return true;
-// 	run();
+// 	run(); (this line is automatically executed at the end of this function)
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,60 +441,52 @@ void Humanoid::run()
 			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
 			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
 			
-			// Compute the feedforward + feedback control for the joint acceleration
+			// Compute the joint control
 			for(int i = 0; i < this->n; i++)
 			{
-				qddot[i] = qddot_d[i] + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]);
+				qddot[i] = qddot_d[i]                                                             // Feedforward term
+				         + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]); // Feedback term
+				
+				
+				// Make sure the kinematic constraints aren't violated
+				
+				double aMax = std::min((this->qMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
+				                       (this->vLim[i] - this->qdot[i])/this->dt);
+				double aMin = std::max((this->qMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
+						       (-this->vLim[i] - this->qdot[i])/this->dt);
+				
+				if(qddot[i] > aMax)      qddot[i] = aMax;                          // Just below the maximum
+				else if(qddot[i] < aMin) qddot[i] = aMin;                          // Just above the minimum
 			}
-			
-//			std::cout << q_d.toString() << std::endl;
-			
+
 			// Compute the inverse dynamics from the joint accelerations
-			iDynTree::Vector6 baseAcc; baseAcc.zero();                                       // Don't move the base
-			iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();            // No external forces applied
-			this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalizedForces); // Solve the inverse dynamics
-			tau = this->generalizedForces.jointTorques();                                    // Get the joint torques
+			iDynTree::Vector6 baseAcc; baseAcc.zero();                                   // Don't move the base
+			iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();        // No external forces applied
+			this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalForces); // Solve the inverse dynamics
+			tau = this->generalForces.jointTorques();                                    // Get the joint torques
+			
+			std::cout << "Accelerations:" << std::endl;
+			std::cout << qddot.toString() << std::endl;
 			
 			break;
 		}
 		case cartesian:
 		{
 			// Compute the gravity compensation
-			this->computer.generalizedGravityForces(this->generalizedForces);
-			tau = this->generalizedForces.jointTorques();
+			this->computer.generalizedGravityForces(this->generalForces);
+			tau = this->generalForces.jointTorques();
 			
 			// Variables used in scope
 			iDynTree::Transform x_d;                                                   // Desired pose
 			iDynTree::Twist xdot_d;                                                    // Desired velocity
 			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
-
-			print_dynamics();
-/*			
-			// Get the desired state for the left hand
-			std::cout << "So far so good." << std::endl;
-			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);
-			std::cout << "\nHere is the desired position of the left hand:" << std::endl;
-			std::cout << x_d.getPosition().toString() << std::endl;
-
-			// Compute the gravity compensation
-			this->computer.generalizedGravityForces(this->generalizedForces);
-			tau = this->generalizedForces.jointTorques();
-		
-			// Compute the torques from forces at the hand
-			Eigen::MatrixXd J(6, 6 + this->n);
-			this->computer.getFrameFreeFloatingJacobian("l_hand", J);
-			J = J.block(0,6,6,10);                                                     // Just the Jacobian for the hand
-
-			Eigen::VectorXd f(6);
-			f << 0, -2, -2, 0, 0, 0;                                                   // Force vector	
-			Eigen::VectorXd temp = J.transpose()*f;
-
-			for(int i = 0; i < 10; i++) tau[i] += temp[i];
-*/		
+				
 			break;
 		}
 		default:
 		{
+			this->computer.generalizedGravityForces(this->generalForces);
+			tau = this->generalForces.jointTorques();
 			haiku();
 		}
 	}
@@ -493,8 +500,8 @@ void Humanoid::run()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::threadRelease()
 {
-	this->computer.generalizedGravityForces(this->generalizedForces);                          // Get the torque needed to withstand gravity
-	send_torque_commands(this->generalizedForces.jointTorques());                              // Send to the robot
+	this->computer.generalizedGravityForces(this->generalForces);                              // Get the torque needed to withstand gravity
+	send_torque_commands(this->generalForces.jointTorques());                                  // Send to the robot
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -589,8 +596,8 @@ void Humanoid::print_dynamics()
 	std::cout << A << std::endl;
 	
 	// Compute the Coriolis and gravity torques
-	this->computer.generalizedBiasForces(this->generalizedForces);
-	iDynTree::VectorDynSize h = this->generalizedForces.jointTorques();
+	this->computer.generalizedBiasForces(this->generalForces);
+	iDynTree::VectorDynSize h = this->generalForces.jointTorques();
 	std::cout << "\nHere are the Coriolis and gravity torques:" << std::endl;
 	std::cout << h.toString() << std::endl;
 
