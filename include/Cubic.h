@@ -44,6 +44,19 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
              n(point.size()),                                                                      // Number of waypoints (for n-1 splines)
              t(time)                                                                               // Time to reach each waypoint
 {
+	for(int i = 0; i < point.size(); i++)
+	{
+		for(int j = 0; j < point[0].size(); j++)
+		{
+			if(isnan(point[i][j]))
+			{
+				std::cout << "[ERROR] [CUBIC] Point [" << i+1 << "][" << j+1
+					  << "] was not a number!" << std::endl;
+			}
+		}
+	}
+
+
 	// Check the inputs are sound
 	if(this->n < 2)
 	{
@@ -112,12 +125,19 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 			for(int i = 0; i < this->m; i++)
 			{
 				double dx = point[1][i] - point[0][i];                             // Difference in position between waypoints
-				this->a[i].push_back( -2*dx/pow(dt,3) );
-				this->b[i].push_back(  3*dx/pow(dt,2) );
-				this->c[i].push_back(  0.0            );                           // Dictates start velocity of spline
-				this->d[i].push_back(  point[0][i]    );                           // Dictates start position of spline
+				this->a[i].push_back( -(2*dx)/pow(dt,3) );
+				this->b[i].push_back(  (3*dx)/pow(dt,2) );
+				this->c[i].push_back(  0.0              );                         // Dictates start velocity of spline
+				this->d[i].push_back(  point[0][i]      );                         // Dictates start position of spline
+				
+				if(isnan(this->a[i][0])
+				or isnan(this->b[i][0])
+				or isnan(this->c[i][0])
+				or isnan(this->d[i][0]))
+				{
+					std::cout << "Coefficient for dimension " << i << " is not a number! WTF?" << std::endl;
+				}
 			}
-			
 		}
 		
 		// Arbitrarily many waypoints
@@ -197,71 +217,72 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 {
 	if(not this->isValid)
 	{
-		std::cerr << "[ERROR] [CUBIC] get_state(): "
+		std::cerr << "[ERROR] [CUBIC] get_state(): " 
 			  << "Something went wrong during the construction of this object. "
-			  << "Cannot obtain the state." << std::endl;
+			  << "Could not obtain the desired state." << std::endl;
 		return false;
 	}
 	else if(pos.size() != vel.size() or vel.size() != acc.size())
 	{
 		std::cerr << "[ERROR] [CUBIC] get_state(): "
-			  << "Vectors are not of equal length. pos had " << pos.size() << " << elements, "
-			  << "vel had " << vel.size() << " elements and acc had " << acc.size() << " elements." << std::endl;
+			  << "Input vectors were not of equal length: "
+			  << "'pos' had " << pos.size() << " elements, "
+			  << "'vel' had " << vel.size() << " elements, and "
+			  << "'acc' had " << acc.size() << " elements." << std::endl;
+		return false;
+	}
+	else if(pos.size() != this->m or vel.size() != this->m or acc.size() != this->m)
+	{
+		std::cerr << "[ERROR] [CUBIC] get_state(): "
+			  << "This trajectory has " << this->m << " dimensions but "
+			  << "'pos' had " << pos.size() << " elements, "
+			  << "'vel' had " << vel.size() << " elements, and "
+			  << "'acc' had " << acc.size() << " elements." << std::endl;
 		return false;
 	}
 	else
 	{
-		if(time < this->t[0])                                                              // Not yet started
+		if(time < this->t[0])                                                             // Trajectory not yet started
 		{
-//			std::cout << "Time = " << time << " seconds (not yet started)." << std::endl;
 			for(int i = 0; i < this->m; i++)
 			{
-				pos[i] = this->d[i][0];                                            // Remain at the start
+				pos[i] = this->d[i][0];                                            // Initial position
 				vel[i] = 0.0;                                                      // Don't move
-				acc[i] = 0.0;                                                      
+				acc[i] = 0.0;
 			}
 		}
-		else if(time < this->t[this->n-1])                                                 // Somewhere in the middle
+		else if(time >= this->t[this->n-1])                                                 // Trajectory finished
 		{
-			int j;
-			for(int i = 1; i < this->n-1; i++)
-			{
-				if(time < this->t[i])                                              // Not yet started the ith spline...
-				{
-					j = i-1;                                                   // ... so we must be on spline i-1   
-					break;
-				}
-			}
+			int j = this->n-2;                                                         // Last spline (really n-1, but indexing is weird)
+			double dt = this->t[j+1] - this->t[j];                                     // Elapsed time from start of final spline to end
 			
-			double dt = time - this->t[j];                                             // Elapsed time since start of jth spline
-			
-//			std::cout << "Time = " << time << " seconds. On the spline " << j+1 << "."
-//				  << "Elapsed time: " << time - this->t[j] << " seconds." << std::endl;
-				  
 			for(int i = 0; i < this->m; i++)
 			{
-				pos[i] =   this->a[i][j]*pow(dt,3) +   this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
-				vel[i] = 3*this->a[i][j]*pow(dt,2) + 2*this->b[i][j]*dt        + this->c[i][j];
-				acc[i] = 6*this->a[i][j]*dt        + 2*this->b[i][j];
-			}
-		}
-		else                                                                               // Finished
-		{
-			double dt = this->t[this->n-1] - this->t[this->n-2];                       // Elapsed time from start of last spline to the end
-			
-//			std::cout << "Time = " << time << " seconds (finished). 'Elapsed' time = "
-//				  << dt << " seconds." << std::endl;
-			for(int i = 0; i < this->m; i++)
-			{
-				pos[i] = this->a[i][this->n-2]*pow(dt,3)
-				       + this->b[i][this->n-2]*pow(dt,2)
-				       + this->c[i][this->n-2]*dt
-				       + this->d[i][this->n-2];
+				pos[i] = this->a[i][j]*pow(dt,3) + this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
 				vel[i] = 0.0;
 				acc[i] = 0.0;
 			}
 		}
-		return true;	
+		else                                                                               // Somewhere in the middle
+		{
+			int j;
+			for(int i = 0; i < this->n-1; i++)
+			{
+				if(time < this->t[i+1])
+				{
+					j = i;
+					break;
+				}
+			}
+				
+			double dt = time - this->t[j];                                            // Elapsed time since start of jth spline
+			
+			for(int i = 0; i < this->m; i++)
+			{
+				pos[i] =   this->a[i][j]*pow(dt,3) +   this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
+			}
+		}
+		return true;
 	}
 }
 #endif
