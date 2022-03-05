@@ -137,7 +137,7 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 			B(0,2) = 1/dt2;
 			
 			// Set the constraints in the middle of the trajectory
-			for(int i = 1; i < this->n-2; i++)
+			for(int i = 1; i < this->n-1; i++)
 			{
 				dt1 = this->t[i] - this->t[i-1];
 				dt2 = this->t[i+1] - this->t[i];
@@ -159,8 +159,17 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 //                      B(this->n-1,this->n-3) = 0.0;
 			B(this->n-1,this->n-2) = 1/dt;
 			B(this->n-1,this->n-1) =-1/dt;
+
+/*			
+			std::cout << "\nA:" << std::endl;
+			std::cout << A << std::endl;
+			std::cout << "\nB:" << std::endl;
+			std::cout << B << std::endl;			
+*/			
+			Eigen::MatrixXd C = A.inverse()*B;                                         // This makes things a little easier			
+//			std::cout << "\nC:" << std::endl;
+//			std::cout << C << std::endl;
 			
-			Eigen::MatrixXd C = A.inverse()*B;                                         // This makes things a little easier
 			Eigen::VectorXd x(this->n), xddot(this->n);                                // A*xddot = B*x ---> xdd = C*x
 			for(int i = 0; i < this->m; i++)
 			{
@@ -171,18 +180,18 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 				
 				xddot = C*x;                                                       // Accelerations for all n waypoints
 				
-				for(int j = 0; i < this->n-1; j++)                                 // There are only n-1 splines
+				for(int j = 0; j < this->n-1; j++)                                 // There are only n-1 splines
 				{
-					double dt = this->t[i+1] - this->t[i];
+					double dt = this->t[j+1] - this->t[j];
 					
-					a[i].push_back( (xddot(i+1) - xddot(i))/(6*dt) );
-					b[i].push_back(  xddot(i)/2                    );
+					a[i].push_back( (xddot(j+1) - xddot(j))/(6*dt) );
+					b[i].push_back(  xddot(j)/2                    );
 					
 					if(i == 0)             c[i].push_back(  0.0                                            );
-					else if(i < this->n-2) c[i].push_back( (x(i+1)-x(i))/dt - (xddot(i+1)+2*xddot(i))*dt/6 );
-					else                   c[i].push_back(-(xddot(i) + xddot(i+1))*dt/2                    );
+					else if(i < this->n-2) c[i].push_back( (x(j+1)-x(j))/dt - (xddot(j+1)+2*xddot(j))*dt/6 );
+					else                   c[i].push_back(-(xddot(j) + xddot(j+1))*dt/2                    );
 					
-					d[i].push_back( x(i) );
+					d[i].push_back( x(j) );
 				}
 			}
 		}
@@ -221,7 +230,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 	}
 	else
 	{
-		if(time <= this->t[0])                                                             // Not yet started
+		if(time < this->t[0])                                                             // Not yet started
 		{
 			for(int i = 0; i < this->m; i++)
 			{
@@ -230,7 +239,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 				acc[i] = 0.0;
 			}
 		}
-		else if(time > this->t[this->n-1])                                                 // Finished
+		else if(time >= this->t[this->n-1])                                                 // Finished
 		{
 			int j = this->n-2;
 			double dt = this->t[j+1] - this->t[j];                                     // Elapsed time from start of last spline to end
