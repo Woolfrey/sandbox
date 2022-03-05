@@ -80,10 +80,19 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
+				// List of waypoints to move through
 				std::vector<iDynTree::VectorDynSize> positions;
-				positions.push_back(iDynTree::VectorDynSize(wave));
-				positions.push_back(iDynTree::VectorDynSize(home));
-				robot.move_to_positions(positions);
+				positions.push_back(iDynTree::VectorDynSize(hmmm));
+				positions.push_back(iDynTree::VectorDynSize(hmmm));
+				positions.push_back(iDynTree::VectorDynSize(neutral));
+				
+				// List of times to reach each waypoint
+				std::vector<double> times;
+				times.push_back(2);
+				times.push_back(4);
+				times.push_back(6);
+				
+				robot.move_to_positions(positions, times);
 				output.addString("Cosa");
 			}
 			
