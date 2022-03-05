@@ -436,25 +436,24 @@ void Humanoid::run()
 	{
 		case joint:
 		{
-			iDynTree::VectorDynSize qddot(this->n);                                    // We want to compute this
+			iDynTree::VectorDynSize qddot(this->n);                                    // Reference acceleration to be computed
+			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);   // Desired state
 			
-			// Get the desired joint state
-			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
 			if(this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime))
 			{
 				for(int i = 0; i < this->n; i++)
 				{
-					// Comput the joint control
+					// Compute the joint control
 					qddot[i] = qddot_d[i]                                      // Feedforward term
 						 + this->Kd*(qdot_d[i] - this->qdot[i])            // Derivative gain
 						 + this->Kq*(q_d[i] - this->q[i]);                 // Proportional gain
 					
 					// Ensure it is kinematically feasible
 					double aMax = std::min((this->qMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-						               (this->vLim[i] - this->qdot[i])/this->dt);
+							       (this->vLim[i] - this->qdot[i])/this->dt);
 					double aMin = std::max((this->qMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
 							       (-this->vLim[i] - this->qdot[i])/this->dt);
-					
+
 					if(qddot[i] > aMax)      qddot[i] = aMax;                  // Just below the maximum
 					else if(qddot[i] < aMin) qddot[i] = aMin;                  // Just above the minimum
 				}

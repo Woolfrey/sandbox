@@ -44,19 +44,6 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
              n(point.size()),                                                                      // Number of waypoints (for n-1 splines)
              t(time)                                                                               // Time to reach each waypoint
 {
-	for(int i = 0; i < point.size(); i++)
-	{
-		for(int j = 0; j < point[0].size(); j++)
-		{
-			if(isnan(point[i][j]))
-			{
-				std::cout << "[ERROR] [CUBIC] Point [" << i+1 << "][" << j+1
-					  << "] was not a number!" << std::endl;
-			}
-		}
-	}
-
-
 	// Check the inputs are sound
 	if(this->n < 2)
 	{
@@ -129,14 +116,6 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 				this->b[i].push_back(  (3*dx)/pow(dt,2) );
 				this->c[i].push_back(  0.0              );                         // Dictates start velocity of spline
 				this->d[i].push_back(  point[0][i]      );                         // Dictates start position of spline
-				
-				if(isnan(this->a[i][0])
-				or isnan(this->b[i][0])
-				or isnan(this->c[i][0])
-				or isnan(this->d[i][0]))
-				{
-					std::cout << "Coefficient for dimension " << i << " is not a number! WTF?" << std::endl;
-				}
 			}
 		}
 		
@@ -242,19 +221,19 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 	}
 	else
 	{
-		if(time < this->t[0])                                                             // Trajectory not yet started
+		if(time <= this->t[0])                                                             // Not yet started
 		{
 			for(int i = 0; i < this->m; i++)
 			{
-				pos[i] = this->d[i][0];                                            // Initial position
-				vel[i] = 0.0;                                                      // Don't move
+				pos[i] = this->d[i][0];
+				vel[i] = 0.0;
 				acc[i] = 0.0;
 			}
 		}
-		else if(time >= this->t[this->n-1])                                                 // Trajectory finished
+		else if(time > this->t[this->n-1])                                                 // Finished
 		{
-			int j = this->n-2;                                                         // Last spline (really n-1, but indexing is weird)
-			double dt = this->t[j+1] - this->t[j];                                     // Elapsed time from start of final spline to end
+			int j = this->n-2;
+			double dt = this->t[j+1] - this->t[j];                                     // Elapsed time from start of last spline to end
 			
 			for(int i = 0; i < this->m; i++)
 			{
@@ -263,7 +242,7 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 				acc[i] = 0.0;
 			}
 		}
-		else                                                                               // Somewhere in the middle
+		else                                                                               // Somewhere inbetween
 		{
 			int j;
 			for(int i = 0; i < this->n-1; i++)
@@ -274,12 +253,13 @@ bool Cubic::get_state(iDynTree::VectorDynSize &pos, iDynTree::VectorDynSize &vel
 					break;
 				}
 			}
-				
-			double dt = time - this->t[j];                                            // Elapsed time since start of jth spline
+			double dt = time - this->t[j];
 			
 			for(int i = 0; i < this->m; i++)
 			{
 				pos[i] =   this->a[i][j]*pow(dt,3) +   this->b[i][j]*pow(dt,2) + this->c[i][j]*dt + this->d[i][j];
+				vel[i] = 3*this->a[i][j]*pow(dt,2) + 2*this->b[i][j]*dt        + this->c[i][j];
+				acc[i] = 6*this->a[i][j]*dt        + 2*this->b[i][j];
 			}
 		}
 		return true;
