@@ -90,7 +90,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		// Joint Control
 		double Kq = 50;                                                                    // Proportional gain
-		double Kd = 5.0;                                                                   // Derivative gain
+		double Kd = 2.0;                                                                   // Derivative gain
 		Cubic jointTrajectory;                                                             // Joint level control
 		
 		// Cartesian Control
@@ -236,13 +236,14 @@ bool Humanoid::move_to_position(const iDynTree::VectorDynSize &position)
 	}
 	else
 	{
-		double t = 2.0;
+		double t = 2.0;                                                                    // Default trajectory time
+
 		for(int i = 0; i < this->n; i++)
 		{
 			double dq = abs(position[i] - this->q[i]);                                 // Distance to target from current joint position
-			double tf = (3*dq)/(2*this->vLim[i]);                                      // Time to reach target at max speed
+			double tMin = (3*dq)/(2*this->vLim[i]);                                    // Min. to reach target at max. speed
 			
-			if(tf > t) t = tf;                                                         // Override if previous time is too fast
+			if(tMin > t) t = tMin;                                                     // Override default if its too fast
 		}
 		
 		std::vector<double> time; time.push_back(t);                                       // Add time to a vector object
@@ -286,7 +287,7 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 				
 				double tMin = (3*dq)/(2*this->vLim[j]);                            // Minimum time if average speed is 66% of max
 				
-				if(tMin > t) t = tMin;                                             // Override if its the largest so far
+				if(tMin > t) t = tMin;                                             // Override if default time is too fast
 			}
 			
 			if(i == 0) times.push_back(t);                                             // Assume we start from time t = 0
@@ -439,24 +440,28 @@ void Humanoid::run()
 			
 			// Get the desired joint state
 			iDynTree::VectorDynSize q_d(this->n), qdot_d(this->n), qddot_d(this->n);
-			this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime);
-			
-			// Compute the joint control
-			for(int i = 0; i < this->n; i++)
+			if(this->jointTrajectory.get_state(q_d, qdot_d, qddot_d, elapsedTime))
 			{
-				qddot[i] = qddot_d[i]                                                             // Feedforward term
-				         + this->Kq*(q_d[i] - this->q[i]) + this->Kd*(qdot_d[i] - this->qdot[i]); // Feedback term
-				
-				
-				// Make sure the kinematic constraints aren't violated
-				
-				double aMax = std::min((this->qMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-				                       (this->vLim[i] - this->qdot[i])/this->dt);
-				double aMin = std::max((this->qMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-						       (-this->vLim[i] - this->qdot[i])/this->dt);
-				
-				if(qddot[i] > aMax)      qddot[i] = aMax;                          // Just below the maximum
-				else if(qddot[i] < aMin) qddot[i] = aMin;                          // Just above the minimum
+				for(int i = 0; i < this->n; i++)
+				{
+					// Comput the joint control
+					qddot[i] = qddot_d[i]                                      // Feedforward term
+						 + this->Kd*(qdot_d[i] - this->qdot[i])            // Derivative gain
+						 + this->Kq*(q_d[i] - this->q[i]);                 // Proportional gain
+					
+					// Ensure it is kinematically feasible
+					double aMax = std::min((this->qMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
+						               (this->vLim[i] - this->qdot[i])/this->dt);
+					double aMin = std::max((this->qMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
+							       (-this->vLim[i] - this->qdot[i])/this->dt);
+					
+					if(qddot[i] > aMax)      qddot[i] = aMax;                  // Just below the maximum
+					else if(qddot[i] < aMin) qddot[i] = aMin;                  // Just above the minimum
+				}
+			}
+			else
+			{
+				for(int i = 0; i < this->n; i++) qddot[i] = -this->Kd*this->qdot[i]; // Try not to move!
 			}
 
 			// Compute the inverse dynamics from the joint accelerations
@@ -464,9 +469,6 @@ void Humanoid::run()
 			iDynTree::LinkNetExternalWrenches wrench(this->model); wrench.zero();        // No external forces applied
 			this->computer.inverseDynamics(baseAcc, qddot, wrench, this->generalForces); // Solve the inverse dynamics
 			tau = this->generalForces.jointTorques();                                    // Get the joint torques
-			
-			std::cout << "Accelerations:" << std::endl;
-			std::cout << qddot.toString() << std::endl;
 			
 			break;
 		}
@@ -490,7 +492,17 @@ void Humanoid::run()
 			haiku();
 		}
 	}
+	
+	// Ensure joint torques aren't violated
+	this->computer.generalizedGravityForces(this->generalForces);
+	iDynTree::VectorDynSize g = this->generalForces.jointTorques();
+	for(int i = 0; i < this->n; i++)
+	{
+		if(tau[i] > 100 - g[i])       tau[i] = -100 - g[i];                                // Set max. torque at 100 Nm
+		else if(tau[i] < -100 - g[i]) tau[i] = -100 - g[i];                                // Set min. troque at -100 Nm
+	}
 
+	// Send the commands to the motors
 	send_torque_commands(tau);
 //	if(stop()) threadRelease();
 }
