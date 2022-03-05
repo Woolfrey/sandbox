@@ -90,7 +90,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		// Joint Control
 		double Kq = 50;                                                                    // Proportional gain
-		double Kd = 2.0;                                                                   // Derivative gain
+		double Kd = 5.0;                                                                   // Derivative gain
 		Cubic jointTrajectory;                                                             // Joint level control
 		
 		// Cartesian Control
@@ -197,7 +197,7 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //                                Update the joint state for all the limbs                       //
-///////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////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////////////////////////////////////////////////////////////
 bool Humanoid::update_state()
 {
 	if(JointInterface::read_encoders())
@@ -276,7 +276,7 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 		std::vector<double> times;                                                         // We need to solve for this
 		
 		// Solve an "optimal" time
-		for(int i = 0; i < positions.size()-1; i++)
+		for(int i = 0; i < positions.size(); i++)
 		{
 			double t = 2.0;                                                           // Default time
 			for(int j = 0; j < this->n; j++)
@@ -366,16 +366,18 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 					waypoint[i+1][j] = this->qMin[j] + 0.001;                 // Just above the lower limit
 					
 					std::cout << "[WARNING] [HUMANOID] move_to_positions() "
-						  << "Target position for joint " << j << " of "
-						  << positions[i][j] << " was below the joint limit." << std::endl;
+						  << "Target position for joint " << j+1 << " of "
+						  << positions[i][j]*180/M_PI << " degrees was below the joint limit of "
+						  << this->qMin[j]*180/M_PI << " degrees." << std::endl;
 				}
 				else if(waypoint[i+1][j] > this->qMax[j])
 				{
 					waypoint[i+1][j] = this->qMax[j] - 0.001;                  // Just below the lower limit
 					
 					std::cout << "[WARNING] [HUMANOID] move_to_position() "
-						  << "Target position for joint " << j << " of "
-						  << positions[i][j] << " was above the joint limit." << std::endl;
+						  << "Target position for joint " << j+1 << " of "
+						  << positions[i][j]*180/M_PI << " degrees was above the joint limit of "
+						  << this->qMax[j]*180/M_PI << " degrees." << std::endl;
 				}
 			}
 		}
