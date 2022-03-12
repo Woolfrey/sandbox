@@ -25,12 +25,12 @@ class Quintic
 			       iDynTree::VectorDynSize &vel,
 			       iDynTree::VectorDynSize &acc,
 			       const double &time);
-	
-	private:
-		bool isNotValid = false;                                                           // Will not do any computations if there is a problem
+			       
+	protected:
+		bool isValid = true;                                                               // Will not do any computations if there is a problem
 		double a, b, c;                                                                    // Polynomial coefficients
 		double t1, t2;                                                                     // Start time and end time for the trajectory
-		iDynTree::VectorDynSize p1, p2;                                                    // Start point and end point
+		iDynTree::VectorDynSize p1, p2;                                       
 		int m;                                                                             // Number of dimensions
 		
 };                                                                                                 // Semicolon needed after class declaration
@@ -48,25 +48,34 @@ Quintic::Quintic(const iDynTree::VectorDynSize &startPoint,
 		 t2(endTime),
 		 m(startPoint.size())
 {
-	// Check the times are in order
-	if(this->t1 > this->t2)
+	if(this->t1 == this->t2)
 	{
-		std::cerr << "[WARNING] [QUINTIC] Constructor : Start time of " << this->t1 << " is greater than end time of " << this->t2
-			<< ". Swapping the values..." << std::endl;
-				
-		double temp = this->t1;
-		this->t1 = this->t2;
-		this->t2 = temp;
+		std::cerr << "[WARNING] [QUINTIC] Constructor: "
+			  << "Start time of " << startTime << " is equal to end time of " << endTime << "." << std::endl;
+			  
+		this->isValid = false;
 	}
-	if(startPoint.size() != endPoint.size())
+	else if(startPoint.size() != endPoint.size())
 	{
 		std::cerr  << "[ERROR] [QUINTIC] Constructor : Input vectors are not of equal length!"
 			<< " Start point has " << startPoint.size() << " elements and end point has "
 			<< endPoint.size() << " elements." << std::endl;
-		this->isNotValid = true;
+			
+		this->isValid = false;
 	}
 	else
 	{
+		// Check the times are in order
+		if(this->t1 > this->t2)
+		{
+			std::cerr << "[WARNING] [QUINTIC] Constructor : "
+				  << "Start time of " << this->t1 << " is greater than end time of " << this->t2 << ". "
+				  << "Swapping the values to avoid problems..." << std::endl;
+			
+			this->t1 = endTime;
+			this->t2 = startTime;
+		}
+		
 		// Compute the the coefficients for x(t) = a*t^5 + b*t^4 + c*t^3
 		double dt = this->t2 - this->t1;
 		this->a =  6*pow(dt,-5);
@@ -85,17 +94,20 @@ bool Quintic::get_state(iDynTree::VectorDynSize &pos,
 {
 	if(pos.size() != vel.size() || vel.size() != acc.size())
 	{
-		std::cerr	<< "[ERROR] [QUINTIC] get_state() : Input vectors are not of equal length!"
-				<< " pos: " << pos.size() << " vel: " << vel.size() << " acc: " << acc.size() << std::endl;
+		std::cerr << "[ERROR] [QUINTIC] get_state() : "
+			  << "Input vectors are not of equal length!"
+			  << " pos: " << pos.size() << " vel: " << vel.size() << " acc: " << acc.size() << std::endl;
+			  
 		pos = this->p1;
 		vel.resize(this->m); vel.zero();
 		acc.resize(this->m); acc.zero();
 		return false;
 	}
-	else if(this->isNotValid)
+	else if(not this->isValid)
 	{
-		std::cerr 	<< "[ERROR] [QUINTIC] get_state() : Could not obtain the desired state from this object. "
-				<< "Check that it was constructed correctly." << std::endl;
+		std::cerr << "[ERROR] [QUINTIC] get_state() : "
+			  << "Could not obtain the desired state from this object. "
+			  << "Check that it was constructed correctly." << std::endl;
 				
 		pos = this->p1;                                                                    // Remain at the start
 		vel.zero(); acc.zero();	                                                           // Don't move
