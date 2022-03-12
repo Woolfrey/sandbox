@@ -133,6 +133,26 @@ Humanoid::Humanoid(const std::string &fileName) :
 	this->gravity(1) = 0.0;
 	this->gravity(2) =-9.81;
 	
+	// Set the Cartesian control gains
+	this->K.resize(6,6);
+	this->K(0,0) = 10.0;
+	this->K(1,1) = 10.0;
+	this->K(2,2) = 10.0;
+	this->K(3,3) = 2.0;
+	this->K(3,4) = 0.5;
+	this->K(4,3) = 0.5;
+	this->K(4,4) = 2.0;
+	this->K(5,5) = 2.0;
+
+/*
+	this->D.resize(6,6);
+	for(int i = 0; i < 3; i++)
+	{
+		this->D[i][i]     = 1.0;
+		this->D[i+3][i+3] = 0.1;
+	}
+*/
+
 	// Load a model
 	iDynTree::ModelLoader loader;                                                              // Temporary
 
@@ -149,6 +169,7 @@ Humanoid::Humanoid(const std::string &fileName) :
 			std::cerr << "[ERROR] [HUMANOID] Constructor: "
 			          << "Could not generate iDynTree::KinDynComputations class from given model: "
 			          << loader.model().toString() << std::endl;
+			this->isValid = false;
 		}
 		else
 		{
@@ -163,8 +184,12 @@ Humanoid::Humanoid(const std::string &fileName) :
 			{
 				move_to_position(iDynTree::VectorDynSize(startConfiguration));
 			}
-			else	std::cerr << "[ERROR] [HUMANOID] Constructor: "
+			else
+			{
+				std::cerr << "[ERROR] [HUMANOID] Constructor: "
 			                  << "Could not activate joint control." << std::endl;
+			        this->isValid = false;
+			}
 		}
 	}
 }
@@ -192,6 +217,16 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
                                            const iDynTree::Transform &actual)
 {
 	iDynTree::Vector6 error;                                                                   // Value to be returned
+	iDynTree::Position pos = desired.getPosition() - actual.getPosition();                     // Position error
+	iDynTree::Rotation rot = desired.getRotation()*actual.getRotation().inverse();             // Rotation error
+	iDynTree::Vector3 rpy = rot.asRPY();                                                       // Get the error as roll, pitch, yaw angles
+	
+	for(int i = 0; i < 3; i++)
+	{
+		error[i]   = pos[i];
+		error[i+3] = rpy[i];
+	}
+	
 	return error;
 }
 
@@ -409,7 +444,16 @@ void Humanoid::halt()
 void Humanoid::force_test()
 {
 	if(isRunning()) stop();                                                                    // Stop any control threads that are running
+	
+	iDynTree::Transform T0 = get_hand_pose("left");                                            // As it says on the label
+	iDynTree::Position temp = T0.getPosition();                                                // Extract the position vector
+	temp[1] -= 0.1;                                                                            // Move the left hand left
+	iDynTree::Transform Tf = T0;
+	Tf.setPosition(temp);                                                                      // Override
+	leftHandTrajectory = CartesianTrajectory(T0,Tf,0.0,5.0);                                   // Set the left hand trajectroy
+	
 	this->controlSpace = cartesian;                                                            // Switch to Cartesian control
+	
 	start();                                                                                   // Start a new control loop
 //	threadInit(); (this line is automatically executed when start() is called)
 }
@@ -450,12 +494,13 @@ void Humanoid::run()
 						 + this->Kd*(qdot_d[i] - this->qdot[i])            // Derivative gain
 						 + this->Kq*(q_d[i] - this->q[i]);                 // Proportional gain
 					
-					// Ensure it is kinematically feasible
+					// Compute the joint limits
 					double aMax = std::min((this->qMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
 							       (this->vLim[i] - this->qdot[i])/this->dt);
 					double aMin = std::max((this->qMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
 							       (-this->vLim[i] - this->qdot[i])/this->dt);
 
+					// Cap the control to remain in limits
 					if(qddot[i] > aMax)      qddot[i] = aMax;                  // Just below the maximum
 					else if(qddot[i] < aMin) qddot[i] = aMin;                  // Just above the minimum
 				}
@@ -483,6 +528,25 @@ void Humanoid::run()
 			iDynTree::Transform x_d;                                                   // Desired pose
 			iDynTree::Twist xdot_d;                                                    // Desired velocity
 			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
+			
+			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);
+			
+			iDynTree::Transform x = get_hand_pose("left");                             // Actual pose
+			
+			iDynTree::Vector6 e = get_pose_error(x_d, x);
+			
+			std::cout << "\nHere is the pose error:" << std::endl;
+			std::cout << e.toString() << std::endl;
+			
+			iDynTree::VectorDynSize f(6);
+			
+			for(int i = 0; i < 6; i++)
+			{
+				for(int j = 0; j < 6; j++) f[i] += this->K(i,j)*e[j];
+			}
+			
+			std::cout << "\nHere is the force vector:" << std::endl;
+			std::cout << f.toString() << std::endl;
 				
 			break;
 		}
