@@ -24,10 +24,6 @@ class QuinticRotation : public Quintic
 				iDynTree::GeomVector3 &vel,
 				iDynTree::GeomVector3 &acc,
 				const double &time);
-			
-	private:
-		iDynTree::Rotation R0;                                                             // Initial rotation
-
 };                                                                                                 // Semicolon needed after a class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,38 +32,49 @@ class QuinticRotation : public Quintic
 QuinticRotation::QuinticRotation(const iDynTree::Rotation &startPoint,
                                  const iDynTree::Rotation &endPoint,
                                  const double &startTime,
-                                 const double &endTime):
-                                 R0(startPoint)
+                                 const double &endTime)
 {
-	// Variables in this scope
-	double angle;
-	double axis[3];
-	double norm = 0;
-	iDynTree::Rotation dR;
-	iDynTree::Vector4 dQ;
-	iDynTree::VectorDynSize p1(3); p1.zero();
-	iDynTree::VectorDynSize p2(3);
+	// Set these values in the base class
+	this->t1 = startTime;
+	this->t2 = endTime;
+	this->m = 3;
 	
-	// We need to generate a trajectory across the *difference* in rotation:
-	// R(t) = R(t0)*dR(t) ---> dR(tf) = R(t0)'R(tf)
-	dR = startPoint.inverse()*endPoint;                                                        // Difference in rotation
-	dQ =  dR.asQuaternion();                                                                   // Difference in rotation expressed as a quaternion
-	
-	// Get the angle encoded in the quaternion
-	angle = 2*acos(dQ[0]);                                                                     // eta = cos(0.5*angle)
-	if(angle > M_PI) angle = 2*M_PI - angle;                                                   // If > 180 degrees, take the shorter path
-	
-	// Get the axis encoded in the quaternion
-	for(int i = 0; i < 3; i++) norm += dQ[i+1]*dQ[i+1];                                        // Sum of squares
-	norm = sqrt(norm);                                                                         // Norm of the vector part of the quaternion
-	for(int i = 0; i < 3; i++)
+	// Check the inputs are sound
+	if(startTime == endTime)
 	{
-		axis[i] = dQ[i+1]/norm;                                                            // epsilon = sin(0.5*angle)*axis
-		p2[i] = angle*axis[i];
+		std::cerr << "[ERROR] [QUINTICROTATION] Constructor: "
+			  << "Start time of " << startTime << " is equal to end time of " << endTime << "." << std::endl;
+		this->isValid = false;
 	}
-	
-	// Now input to the derived class
-	Quintic(p1, p2, startTime, endTime);                                                       // NOTE: Start at zero, interpolate over angle*axis
+	else
+	{
+		if(startTime > endTime)
+		{
+			std::cout << "[WARNING] [QUINTICROTATION] Constructor: "
+				  << "Start time of " << startTime << " is greater than end time of " << endTime << ". "
+				  << "Swapping their values to avoid problems..." << std::endl;
+				  
+			this->t1 = endTime;
+			this->t2 = startTime;
+		}
+		
+		iDynTree::Vector3 temp1 = startPoint.asRPY();
+		iDynTree::Vector3 temp2 = endPoint.asRPY();
+		
+		// Put the rpy values in to the 'position' vectors in the base class
+		this->p1.resize(3); this->p2.resize(3);
+		for(int i = 0; i < 3; i++)
+		{
+			this->p1[i] = temp1[i];
+			this->p2[i] = temp2[i];
+		}
+		
+		// Compute the the coefficients for x(t) = a*t^5 + b*t^4 + c*t^3
+		double dt = this->t2 - this->t1;
+		this->a =  6*pow(dt,-5);
+		this->b =-15*pow(dt,-4);
+		this->c = 10*pow(dt,-3);
+	}
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,44 +85,27 @@ bool QuinticRotation::get_state(iDynTree::Rotation &rot,
 				iDynTree::GeomVector3 &acc,
 				const double &time)
 {
-	// Variables in this scope
-	double angle = 0;                                                                          // Difference in angle of rotation
-	double axis[3];                                                                            // Axis of rotation
-	iDynTree::Rotation dR;                                                                     // Difference in rotation
-	iDynTree::VectorDynSize p(3), v(3), a(3);                                                  // Position, velocity, and acceleration
-	iDynTree::Vector4 dQ;                                                                      // Difference in orientation as a quaternion
-	
-	std::cout << "We are in the Quintic Rotation object." << std::endl;
-	
-	std::cout << "UNABLE TO ACCESS BASE CLASS! HAS IT BEEN SET PROPERLY?" << std::endl;
-	if(Quintic::get_state(p, v, a, time))
+	iDynTree::VectorDynSize p(3), v(3), a(3);
+	if(Quintic::get_state(p,v,a,time))
 	{
-		std::cout << "State obtained from base class." << std::endl;
-		
-		for(int i = 0; i < 3; i++) angle += p[i]*p[i];                                     // Sum of squares
-		angle = sqrt(angle);                                                               // This completes the norm
-	
-		dQ[0] = cos(0.5*angle);                                                            // Scalar part of the quaternion
+		rot = iDynTree::Rotation::RPY(p[0], p[1], p[2]);
 		for(int i = 0; i < 3; i++)
 		{
-			axis[i] = p[i]/angle;                                                      // p = angle*axis
-			dQ[i+1] = sin(0.5*angle)*axis[i];                                          // Vector part of the quaternion
 			vel[i] = v[i];
 			acc[i] = a[i];
 		}
-		dR.fromQuaternion(dQ);                                                             // Convert to rotation object
-		rot = this->R0*dR;                                                                 // R(t) = R0*dR(t)
+		
 		return true;
 	}
 	else
 	{
-		std::cerr << "[ERROR] [QUINTICROTATION] get_state() : Could not obtain the state for the given time." << std::endl;
-		rot = this->R0;
-		for(int i = 0; i < 3; i++)
-		{
-			vel[i] = 0;
-			acc[i] = 0;
-		}
+		std::cerr << "[ERROR] [QUINTICROTATION] get_state(): "
+			  << "Could not obtain the state." << std::endl;
+			  
+		rot = iDynTree::Rotation::RPY(this->p1[0], this->p1[1], this->p1[2]);
+		vel.zero();
+		acc.zero();
+		
 		return false;
 	}
 }
