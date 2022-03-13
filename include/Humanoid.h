@@ -135,23 +135,21 @@ Humanoid::Humanoid(const std::string &fileName) :
 	
 	// Set the Cartesian control gains
 	this->K.resize(6,6);
-	this->K(0,0) = 10.0;
-	this->K(1,1) = 10.0;
-	this->K(2,2) = 10.0;
-	this->K(3,3) = 2.0;
+	this->K(0,0) = 50.0;
+	this->K(1,1) = 50.0;
+	this->K(2,2) = 50.0;
+	this->K(3,3) = 5.0;
 	this->K(3,4) = 0.5;
 	this->K(4,3) = 0.5;
-	this->K(4,4) = 2.0;
-	this->K(5,5) = 2.0;
+	this->K(4,4) = 5.0;
+	this->K(5,5) = 5.0;
 
-/*
 	this->D.resize(6,6);
 	for(int i = 0; i < 3; i++)
 	{
-		this->D[i][i]     = 1.0;
-		this->D[i+3][i+3] = 0.1;
+		this->D(i,i)     = 5.0;
+		this->D(i+3,i+3) = 0.5;
 	}
-*/
 
 	// Load a model
 	iDynTree::ModelLoader loader;                                                              // Temporary
@@ -447,7 +445,8 @@ void Humanoid::force_test()
 	
 	iDynTree::Transform T0 = get_hand_pose("left");                                            // As it says on the label
 	iDynTree::Position temp = T0.getPosition();                                                // Extract the position vector
-	temp[1] -= 0.1;                                                                            // Move the left hand left
+	temp[1] -= 0.2;                                                                            // Move the left hand left
+	temp[2] -= 0.05;                                                                           // Move the hand down a bit
 	iDynTree::Transform Tf = T0;
 	Tf.setPosition(temp);                                                                      // Override
 	leftHandTrajectory = CartesianTrajectory(T0,Tf,0.0,5.0);                                   // Set the left hand trajectroy
@@ -524,29 +523,66 @@ void Humanoid::run()
 			this->computer.generalizedGravityForces(this->generalForces);
 			tau = this->generalForces.jointTorques();
 			
-			// Variables used in scope
+			// Get the desired state from the trajectory
 			iDynTree::Transform x_d;                                                   // Desired pose
 			iDynTree::Twist xdot_d;                                                    // Desired velocity
 			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
+			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);     // Get the desired state
 			
-			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);
 			
-			iDynTree::Transform x = get_hand_pose("left");                             // Actual pose
+			// Get the actual state from the kinematics
+			iDynTree::Transform x = get_hand_pose("left");                             // Actual pose of the left hand
+			Eigen::MatrixXd J(6,6+this->n);
+			this->computer.getFrameFreeFloatingJacobian("l_hand",J);                   // Get the full Jacobian
+			J = J.block(0,6,6,10);                                                     // Just the left arm joints
 			
-			iDynTree::Vector6 e = get_pose_error(x_d, x);
-			
-			std::cout << "\nHere is the pose error:" << std::endl;
-			std::cout << e.toString() << std::endl;
-			
-			iDynTree::VectorDynSize f(6);
+			// Compute error terms for feedback control
+			iDynTree::Vector6 e = get_pose_error(x_d, x);                              // Pose error between desired and actual
+			iDynTree::Vector6 edot; edot.zero();                                       // Cartesian velocity error
 			
 			for(int i = 0; i < 6; i++)
 			{
-				for(int j = 0; j < 6; j++) f[i] += this->K(i,j)*e[j];
+				for(int j = 0; j < 10; j++) edot(i) += xdot_d(i) - J(i,j)*this->qdot(j);
 			}
 			
-			std::cout << "\nHere is the force vector:" << std::endl;
-			std::cout << f.toString() << std::endl;
+			// Compute the feedback linearization term
+			Eigen::MatrixXd M(6+this->n, 6+this->n);
+			this->computer.getFreeFloatingMassMatrix(M);
+			M = M.block(6,6,10,10);                                                    // Just the inertia for the left hand
+			Eigen::MatrixXd invM = inverse(M);                                         // Inverse of the inertia matrix
+			Eigen::MatrixXd A = inverse(J*invM*J.transpose());                         // Cartesian inertia matrix of the left hand
+			this->computer.generalizedBiasForces(this->generalForces);
+			iDynTree::VectorDynSize h = this->generalForces.jointTorques();            // C*qdot + g
+			iDynTree::Vector6  b = this->computer.getFrameBiasAcc("l_hand");           // Jdot*qdot
+			
+			Eigen::MatrixXd temp = J*invM;
+			iDynTree::Vector6 c; c.zero();
+			for(int i = 0; i < 6; i++)
+			{
+				for(int j = 0; j < 6; j++) c(i) = temp(i,j)*h(j);
+			}
+			
+			iDynTree::Vector6 fbl; fbl.zero();
+			for(int i = 0; i < 6; i++)
+			{
+				for(int j = 0; j < 6; j++) fbl(i) = A(i,j)*(c(j) - b(j));
+			}
+			
+			// Compute the Cartesian force vector
+			iDynTree::Vector6 f; f.zero();
+			for(int i = 0; i < 6; i++)
+			{
+				for(int j = 0; j < 6; j++)
+				{
+					f(i) += A(i,j)*xddot_d(j) + this->D(i,j)*edot(j) + this->K(i,j)*e(j) + fbl(j);
+				}
+			}
+			
+			// Add it to the joint torque vector
+			for(int i = 0; i < 6; i++)
+			{
+				for(int j = 0; j < 10; j++) tau(j) += J(i,j)*f(i);
+			}
 				
 			break;
 		}
