@@ -33,6 +33,9 @@ class Cubic
 		int m, n;                                                                          // m dimensions across n waypoints (for n-1 splines)
 		std::vector<double> t;                                                             // Time to reach each waypoint
 		std::vector<std::vector<double>> a, b, c, d;                                       // Spline coefficients
+		
+		void compute_coefficients(const std::vector<iDynTree::VectorDynSize> &point,
+					  const std::vector<double> &time);
 };                                                                                                 // Semicolon needed after a class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,102 +100,98 @@ Cubic::Cubic(const std::vector<iDynTree::VectorDynSize> &point,
 	}
 	
 	// No problems
-	if(this->isValid)
+	if(this->isValid) compute_coefficients(point,time);
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                        Compute the coefficients for each spline                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void Cubic::compute_coefficients(const std::vector<iDynTree::VectorDynSize> &point, const std::vector<double> &time)
+{
+	// Resize the vector of coefficients
+	this->a.resize(this->m);
+	this->b.resize(this->m);
+	this->c.resize(this->m);
+	this->d.resize(this->m);
+
+	// Two waypoints
+	if(this->n == 2)
 	{
-		// Resize the vector of coefficients
-		this->a.resize(this->m);
-		this->b.resize(this->m);
-		this->c.resize(this->m);
-		this->d.resize(this->m);
-		
-		// Two waypoints
-		if(this->n == 2)
+		double dt = time[1] - time[0];                                             // Difference in time between waypoints
+		for(int i = 0; i < this->m; i++)
 		{
-			double dt = time[1] - time[0];                                             // Difference in time between waypoints
-			for(int i = 0; i < this->m; i++)
-			{
-				double dx = point[1][i] - point[0][i];                             // Difference in position between waypoints
-				this->a[i].push_back( -(2*dx)/pow(dt,3) );
-				this->b[i].push_back(  (3*dx)/pow(dt,2) );
-				this->c[i].push_back(  0.0              );                         // Dictates start velocity of spline
-				this->d[i].push_back(  point[0][i]      );                         // Dictates start position of spline
-			}
+			double dx = point[1][i] - point[0][i];                             // Difference in position between waypoints
+			this->a[i].push_back( -(2*dx)/pow(dt,3) );
+			this->b[i].push_back(  (3*dx)/pow(dt,2) );
+			this->c[i].push_back(  0.0              );                         // Dictates start velocity of spline
+			this->d[i].push_back(  point[0][i]      );                         // Dictates start position of spline
+		}
+	}
+
+	// Arbitrarily many waypoints
+	else
+	{
+		// Accelerations are related to velocities by A*xdd = B*x
+		Eigen::MatrixXd A = Eigen::MatrixXd::Zero(this->n, this->n);
+		Eigen::MatrixXd B = Eigen::MatrixXd::Zero(this->n, this->n);
+		
+		// Set the constraints for the start of the trajectory
+		double dt1 = this->t[1] - this->t[0];
+		double dt2 = this->t[2] - this->t[1];
+		A(0,0) = dt1/2;
+		A(0,1) = dt1/2 + dt2/3;
+		A(0,2) = dt2/6;
+//              B(0,0) = 0.0;
+		B(0,1) = -1/dt2;
+		B(0,2) = 1/dt2;
+		
+		// Set the constraints in the middle of the trajectory
+		for(int i = 1; i < this->n-1; i++)
+		{
+			dt1 = this->t[i] - this->t[i-1];
+			dt2 = this->t[i+1] - this->t[i];
+			
+			A(i,i-1) = dt1/6;
+			A(i,i)   = (dt1 + dt2)/3;
+			A(i,i+1) = dt2/6;
+			
+			B(i,i-1) = 1/dt1;
+			B(i,i)   = -(1/dt1 + 1/dt2);
+			B(i,i+1) = 1/dt2;
 		}
 		
-		// Arbitrarily many waypoints
-		else
+		// Set the constraints at the end of the trajectory
+		double dt = this->t[this->n-1] - this->t[this->n-2];
+//              A(this->n-1,this->n-3) = 0.0;
+		A(this->n-1,this->n-2) = dt/6;
+		A(this->n-1,this->n-1) = dt/3;
+//              B(this->n-1,this->n-3) = 0.0;
+		B(this->n-1,this->n-2) = 1/dt;
+		B(this->n-1,this->n-1) =-1/dt;
+		
+		Eigen::MatrixXd C = A.inverse()*B;                                         // This makes things a little easier			
+		Eigen::VectorXd x(this->n), xddot(this->n);                                // A*xddot = B*x ---> xdd = C*x
+		for(int i = 0; i < this->m; i++)
 		{
-			// Accelerations are related to velocities by A*xdd = B*x
-			Eigen::MatrixXd A = Eigen::MatrixXd::Zero(this->n, this->n);
-			Eigen::MatrixXd B = Eigen::MatrixXd::Zero(this->n, this->n);
+			// 'point' is stored as n waypoints with m dimensions,
+			// but vectors a, b, c, and d are stored as m dimensions with
+			// n waypoints, hence the weird indexing
+			for(int j = 0; j < this->n; j++) x(j) = point[j][i];               // Get all n waypoints of the ith dimension
 			
-			// Set the constraints for the start of the trajectory
-			double dt1 = this->t[1] - this->t[0];
-			double dt2 = this->t[2] - this->t[1];
-			A(0,0) = dt1/2;
-			A(0,1) = dt1/2 + dt2/3;
-			A(0,2) = dt2/6;
-//                      B(0,0) = 0.0;
-			B(0,1) = -1/dt2;
-			B(0,2) = 1/dt2;
+			xddot = C*x;                                                       // Accelerations for all n waypoints
 			
-			// Set the constraints in the middle of the trajectory
-			for(int i = 1; i < this->n-1; i++)
+			for(int j = 0; j < this->n-1; j++)                                 // There are only n-1 splines
 			{
-				dt1 = this->t[i] - this->t[i-1];
-				dt2 = this->t[i+1] - this->t[i];
+				double dt = this->t[j+1] - this->t[j];
 				
-				A(i,i-1) = dt1/6;
-				A(i,i)   = (dt1 + dt2)/3;
-				A(i,i+1) = dt2/6;
+				a[i].push_back( (xddot(j+1) - xddot(j))/(6*dt) );
+				b[i].push_back(  xddot(j)/2                    );
 				
-				B(i,i-1) = 1/dt1;
-				B(i,i)   = -(1/dt1 + 1/dt2);
-				B(i,i+1) = 1/dt2;
-			}
-			
-			// Set the constraints at the end of the trajectory
-			double dt = this->t[this->n-1] - this->t[this->n-2];
-//                      A(this->n-1,this->n-3) = 0.0;
-			A(this->n-1,this->n-2) = dt/6;
-			A(this->n-1,this->n-1) = dt/3;
-//                      B(this->n-1,this->n-3) = 0.0;
-			B(this->n-1,this->n-2) = 1/dt;
-			B(this->n-1,this->n-1) =-1/dt;
-
-/*			
-			std::cout << "\nA:" << std::endl;
-			std::cout << A << std::endl;
-			std::cout << "\nB:" << std::endl;
-			std::cout << B << std::endl;			
-*/			
-			Eigen::MatrixXd C = A.inverse()*B;                                         // This makes things a little easier			
-//			std::cout << "\nC:" << std::endl;
-//			std::cout << C << std::endl;
-			
-			Eigen::VectorXd x(this->n), xddot(this->n);                                // A*xddot = B*x ---> xdd = C*x
-			for(int i = 0; i < this->m; i++)
-			{
-				// 'point' is stored as n waypoints with m dimensions,
-				// but vectors a, b, c, and d are stored as m dimensions with
-				// n waypoints, hence the weird indexing
-				for(int j = 0; j < this->n; j++) x(j) = point[j][i];               // Get all n waypoints of the ith dimension
+				if(i == 0)             c[i].push_back(  0.0                                            );
+				else if(i < this->n-2) c[i].push_back( (x(j+1)-x(j))/dt - (xddot(j+1)+2*xddot(j))*dt/6 );
+				else                   c[i].push_back(-(xddot(j) + xddot(j+1))*dt/2                    );
 				
-				xddot = C*x;                                                       // Accelerations for all n waypoints
-				
-				for(int j = 0; j < this->n-1; j++)                                 // There are only n-1 splines
-				{
-					double dt = this->t[j+1] - this->t[j];
-					
-					a[i].push_back( (xddot(j+1) - xddot(j))/(6*dt) );
-					b[i].push_back(  xddot(j)/2                    );
-					
-					if(i == 0)             c[i].push_back(  0.0                                            );
-					else if(i < this->n-2) c[i].push_back( (x(j+1)-x(j))/dt - (xddot(j+1)+2*xddot(j))*dt/6 );
-					else                   c[i].push_back(-(xddot(j) + xddot(j+1))*dt/2                    );
-					
-					d[i].push_back( x(j) );
-				}
+				d[i].push_back( x(j) );
 			}
 		}
 	}
