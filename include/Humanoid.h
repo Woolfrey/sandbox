@@ -74,6 +74,8 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		// Control Functions
 		bool update_state();                                                               // Update the joint states
+		bool move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand);  // Move a single hand to a desired pose
+		bool move_to_pose(const iDynTree::Transform &left, const iDynTree::Transform &right);
 		bool move_to_position(const iDynTree::VectorDynSize &position);                    // Move to a desired configuration
 		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions);     // Move through several joint configurations
 		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions,
@@ -83,6 +85,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 	private:
 		bool isValid = true;                                                               // Will not do computations if true
+		bool leftControl, rightControl;
 		double dt = 0.01;                                                                  // Discrete time step
 		enum ControlSpace {joint, cartesian, dual} controlSpace;                           // Switch cases
 		
@@ -173,7 +176,7 @@ Humanoid::Humanoid(const std::string &fileName) :
 		{
 			this->model = computer.model();                                            // Get the model from the computer
 			this->n = model.getNrOfDOFs();                                             // Degrees of freedom / number of joints
-			this->generalForces.resize(this->model);                               // Restructure force class to match model
+			this->generalForces.resize(this->model);                                   // Restructure force class to match model
 			
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 	
@@ -204,6 +207,7 @@ iDynTree::Transform Humanoid::get_hand_pose(const std::string &whichHand)
 		std::cerr << "[ERROR] [HUMANOID] get_hand_pose():"
 		          << "String input was " << whichHand << " but expected 'left' or 'right' as an argument. "
 		          << "Returning left hand pose by default." << std::endl;
+		          
 		return this->computer.getWorldTransform("l_hand");
 	}
 }
@@ -230,7 +234,7 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //                                Update the joint state for all the limbs                       //
-///////////////////////////////////////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////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::update_state()
 {
 	if(JointInterface::read_encoders())
@@ -254,6 +258,44 @@ bool Humanoid::update_state()
 	}
 }
 
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                              Move one hand to a desired pose                                  //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+bool Humanoid::move_to_pose(const iDynTree::Transform &pose, const std::string &whichHand)
+{
+	if(whichHand != "left" and whichHand != "right")
+	{
+		std::cerr << "[ERROR] [HUMANOID] move_to_pose(): "
+			  << "Expected 'left' or 'right' but your input was " << whichHand << "." << std::endl;
+		
+		return false;
+	}
+	else
+	{
+		if(isRunning()) stop();                                                            // Stop any control threads that are running
+		this->controlSpace = cartesian;                                                    // Switch to Cartesian control if not already
+		
+		if(whichHand == "left")
+		{
+			this->leftControl = true;                                                  // Activate left hand control
+			this->rightControl = false;                                                // Deactive right hand control
+			
+			this->leftHandTrajectory = CartesianTrajectory(get_hand_pose("left"), pose, 0, 3.0); // Set up the left hand trajectory
+		}
+		else
+		{
+			this->leftControl = false;                                                 // Deactive the left hand control
+			this->rightControl = true;                                                 // Active the right hand control
+			
+			this->rightHandTrajectory = CartesianTrajectory(get_hand_pose("right"), pose, 0, 3.0); // Set up the right hand trajectory
+		}
+		
+		start();                                                                           // Restart the control thread
+//		threadInit(); this is executed automatically after start is called
+
+		return true;
+	}
+}
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //          Move the joints to a desired configuration (optimal time solved automatically)       //
@@ -474,7 +516,6 @@ void Humanoid::run()
 {
 	update_state();                                                                            // Update the joint state information
 	double elapsedTime = yarp::os::Time::now() - this->startTime;                              // Get elapsed time since start
-	
 	iDynTree::VectorDynSize tau(this->n);                                                      // We want to compute this
 
 	switch(this->controlSpace)
@@ -519,6 +560,124 @@ void Humanoid::run()
 		}
 		case cartesian:
 		{
+			this->computer.generalizedGravityForces(this->generalForces);
+			tau = this->generalForces.jointTorques();                                  // A t 
+
+			// Generate the Jacobian
+			Eigen::MatrixXd J(12,this->n);                                             // Jacobian for both hands
+			Eigen::MatrixXd temp(6,6+this->n);                                         // Jacobian for a single hand
+			this->computer.getFrameFreeFloatingJacobian("l_hand", temp);               // Get the full left hand Jacobian
+			J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the left hand Jacobian
+			this->computer.getFrameFreeFloatingJacobian("r_hand", temp);               // Get the full right hand Jacobian
+			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the right hand Jacobian			
+			
+			// Compute the joint and Cartesian inertia matrices
+			Eigen::MatrixXd M(6+this->n,6+this->n);                                  
+			this->computer.getFreeFloatingMassMatrix(M);                               // Inertia including floating base
+			M = M.block(6,6,this->n,this->n);                                          // Remove the floating base part
+			Eigen::MatrixXd invM = inverse(M);                                         // Invert the inertia matrix
+			Eigen::MatrixXd A = inverse(J*invM*J.transpose());                         // Cartesian inertia matrix
+			
+			// Compute the bias forces
+			this->computer.generalizedBiasForces(this->generalForces);                 // Coriolis term
+			iDynTree::VectorDynSize biasForce = this->generalForces.jointTorques();    // Just the torque vector
+			Eigen::VectorXd c(this->n);                                                // Coriolis torque as Eigen::Vector
+			for(int i = 0; i < this->n; i++) c(i) = biasForce(i);                      // Transfer to Eigen class
+			
+			iDynTree::Vector6 bLeft = this->computer.getFrameBiasAcc("l_hand");        // Jdot*qdot for left hand
+			iDynTree::Vector6 bRight = this->computer.getFrameBiasAcc("r_hand");       // Jdot*qdot for right hand
+			Eigen::VectorXd b(12);                                                     // Combined Jdot*qdot
+			for(int i = 0; i < 6; i++)
+			{
+				b(i)   = bLeft(i);                                                 // Transfer the values
+				b(i+6) = bRight(i);
+			}
+	
+			Eigen::VectorXd bias = A*(J*invM*c - b);                                   // A*(J*invM*C - Jdot)*qdot
+			
+			// Solve the Cartesian control
+			iDynTree::VectorDynSize f(12); f.zero();                                   // Force vector to be computed
+			iDynTree::Transform pose;
+			iDynTree::Twist vel;
+			iDynTree::SpatialAcc acc;
+			iDynTree::Vector6 e; e.zero();
+			iDynTree::Vector6 edot; edot.zero();
+			
+			if(this->leftControl)
+			{	
+				// Get the desired state
+				this->leftHandTrajectory.get_state(pose, vel, acc, elapsedTime);
+				
+				// Compute the tracking error
+				e = get_pose_error(pose, get_hand_pose("left"));
+				
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 0; j < 10; j++) edot(i) += J(i,j)*this->qdot(j);
+				}
+				
+				// Compute the force vector
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 0; j < 6; j++) f(i) += A(i,j)*acc(j) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
+				}
+				
+			}
+			else
+			{
+				J.block(0,0,6,3).setZero();                                        // Remove contribution of torso joints
+	
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 3; j < 10; j++) f(i) -= this->D(i,i)*J(i,j)*this->qdot(j); // Try and keep the hand
+				}
+			}
+			
+			if(this->rightControl)
+			{
+				// Get the desired state
+				this->rightHandTrajectory.get_state(pose, vel, acc, elapsedTime);
+				
+				// Compute the tracking error
+				e = get_pose_error(pose, get_hand_pose("right"));
+				
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 0; j < 10; j++)
+					{
+						if(j < 3) edot(i) += J(i+6,j)*this->qdot(j);
+						else      edot(i) += J(i+6,j+10)*this->qdot(j+10);
+					}
+				}
+				
+				// Compute the force fector
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 0; j < 6; j++) f(i+6) += A(i+6,j+6)*acc(j) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
+				}
+			}
+			else
+			{
+				J.block(6,0,6,3).setZero();                                        // Remove the contribution from the torso joints
+				
+				for(int i = 0; i < 6; i++)
+				{
+					for(int j = 10; j < 17; j++) f(i+6) -= this->D(i,i)*J(i+6,j)*this->qdot(j);
+				}
+			}
+
+			
+			// Solve the Cartesian impedance control
+//			Eigen::MatrixXd N = Eigen::MatrixXd::Identity() - J.transpose*A*J*invM;    // Null space projection matrix
+
+			for(int i = 0; i < this->n; i++)
+			{
+				for(int j = 0; j < 12; j++) tau(i) += J(j,i)*f(j);
+			}
+			
+			std::cout << "\nHere is the force vector:" << std::endl;
+			std::cout << f.toString() << std::endl;
+/*
 			// Compute the gravity compensation
 			this->computer.generalizedGravityForces(this->generalForces);
 			tau = this->generalForces.jointTorques();
@@ -528,7 +687,6 @@ void Humanoid::run()
 			iDynTree::Twist xdot_d;                                                    // Desired velocity
 			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
 			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);     // Get the desired state
-			
 			
 			// Get the actual state from the kinematics
 			iDynTree::Transform x = get_hand_pose("left");                             // Actual pose of the left hand
@@ -583,7 +741,7 @@ void Humanoid::run()
 			{
 				for(int j = 0; j < 10; j++) tau(j) += J(i,j)*f(i);
 			}
-				
+*/		
 			break;
 		}
 		default:
