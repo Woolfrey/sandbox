@@ -48,11 +48,6 @@ int main(int argc, char *argv[])
 				output.addString("Arrivederci");
 				active = false;                                                    // This will break the 'while' loop
 			}
-			else if(command == "force")                                                // Test force applied at the hand
-			{
-				robot.force_test();
-				output.addString("Testing.");
-			}
 			else if(command == "home")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(home));
@@ -73,6 +68,15 @@ int main(int argc, char *argv[])
 				robot.halt();                                                      // Stop any control threads, maintain current position
 				output.addString("Fermata");
 			}
+			else if(command == "test")
+			{
+				iDynTree::Transform T = robot.get_hand_pose("left");               // Get the left hand pose
+				iDynTree::Position p = T.getPosition();                            // Get the position
+				p[1] -= 0.2;                                                       // Move to the right
+				T.setPosition(p);                                                  // Override
+				if(robot.move_to_pose(T,"left")) output.addString("Testing");
+				else                             output.addString("Problema");
+			}
 			else if(command == "wave")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(wave));
@@ -83,14 +87,12 @@ int main(int argc, char *argv[])
 				// List of waypoints to move through
 				std::vector<iDynTree::VectorDynSize> positions;
 				positions.push_back(iDynTree::VectorDynSize(hmmm));
-				positions.push_back(iDynTree::VectorDynSize(hmmm));
 				positions.push_back(iDynTree::VectorDynSize(neutral));
 				
 				// List of times to reach each waypoint
 				std::vector<double> times;
 				times.push_back(2);
 				times.push_back(4);
-				times.push_back(6);
 				
 				robot.move_to_positions(positions, times);
 				output.addString("Cosa");
