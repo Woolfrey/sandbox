@@ -72,8 +72,9 @@ int main(int argc, char *argv[])
 			{
 				iDynTree::Transform T = robot.get_hand_pose("left");               // Get the left hand pose
 				iDynTree::Position p = T.getPosition();                            // Get the position
-				p[1] -= 0.2;                                                       // Move to the right
+				p[1] += 0.2;                                                       // Move to the right
 				T.setPosition(p);                                                  // Override
+//				T.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, 0.0));
 				if(robot.move_to_pose(T,"left")) output.addString("Testing");
 				else                             output.addString("Problema");
 			}
