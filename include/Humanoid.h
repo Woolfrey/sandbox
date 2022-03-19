@@ -7,7 +7,7 @@
 #define HUMANOID_H_
 
 #include <CartesianTrajectory.h>                                                                   // Custom trajectory class
-#include <Cubic.h>
+#include <Cubic.h>                                                                                 // Custom trajectory class
 #include <Eigen/Dense>                                                                             // Eigen::MatrixXd
 #include <Haiku.h>
 #include <iDynTree/KinDynComputations.h>                                                           // Class that does inverse dynamics calculations
@@ -81,7 +81,6 @@ class Humanoid : public yarp::os::PeriodicThread,
 		bool move_to_positions(const std::vector<iDynTree::VectorDynSize> &positions,
 		                       const std::vector<double> &times);
 		void halt();                                                                       // Stop any control and maintain current position
-		void force_test();							          
 		
 	private:
 		bool isValid = true;                                                               // Will not do computations if true
@@ -111,6 +110,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		// Functions
 		Eigen::MatrixXd inverse(const Eigen::MatrixXd &A);                                 // Get the inverse of the given matrix
+		double get_penalty(const int &j);                                                  // Get the penalty for joint limit avoidance
 		void print_kinematics();                                                           // Used for debugging
 		void print_dynamics();                                                             // Used for debugging
 		
@@ -128,7 +128,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 Humanoid::Humanoid(const std::string &fileName) :
 	           yarp::os::PeriodicThread(0.01),                                                 // Create the threading object for control
                    JointInterface(jointList),                                                      // Open communication with the robot
-                   torsoPose(iDynTree::Transform::Identity()),                                     // Set the default pose for the model
+                   torsoPose(iDynTree::Transform(iDynTree::Rotation::RPY(0,0,M_PI),iDynTree::Position(0,0,0.65))),
                    torsoTwist(iDynTree::Twist(iDynTree::GeomVector3(0,0,0), iDynTree::GeomVector3(0,0,0)))
 {
 	// Set the gravity vector
@@ -479,27 +479,6 @@ void Humanoid::halt()
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
- //                                     Testing Cartesian force control                           //
-///////////////////////////////////////////////////////////////////////////////////////////////////
-void Humanoid::force_test()
-{
-	if(isRunning()) stop();                                                                    // Stop any control threads that are running
-	
-	iDynTree::Transform T0 = get_hand_pose("left");                                            // As it says on the label
-	iDynTree::Position temp = T0.getPosition();                                                // Extract the position vector
-	temp[1] -= 0.2;                                                                            // Move the left hand left
-	temp[2] -= 0.05;                                                                           // Move the hand down a bit
-	iDynTree::Transform Tf = T0;
-	Tf.setPosition(temp);                                                                      // Override
-	leftHandTrajectory = CartesianTrajectory(T0,Tf,0.0,5.0);                                   // Set the left hand trajectroy
-	
-	this->controlSpace = cartesian;                                                            // Switch to Cartesian control
-	
-	start();                                                                                   // Start a new control loop
-//	threadInit(); (this line is automatically executed when start() is called)
-}
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
  //                              This is executed just after 'start()' is called                  //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::threadInit()
@@ -560,16 +539,20 @@ void Humanoid::run()
 		}
 		case cartesian:
 		{
-			this->computer.generalizedGravityForces(this->generalForces);
-			tau = this->generalForces.jointTorques();                                  // A t 
+			this->computer.generalizedGravityForces(this->generalForces);              // Compute gravity torques
+			tau = this->generalForces.jointTorques();                                  // At a minimum, compensate for gravity       
 
 			// Generate the Jacobian
 			Eigen::MatrixXd J(12,this->n);                                             // Jacobian for both hands
 			Eigen::MatrixXd temp(6,6+this->n);                                         // Jacobian for a single hand
+			
 			this->computer.getFrameFreeFloatingJacobian("l_hand", temp);               // Get the full left hand Jacobian
 			J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the left hand Jacobian
+			if(not this->leftControl) J.block(0,0,6,3).setZero();                      // Remove contribution of torso joints
+			
 			this->computer.getFrameFreeFloatingJacobian("r_hand", temp);               // Get the full right hand Jacobian
-			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the right hand Jacobian			
+			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the right hand Jacobian
+			if(not this->rightControl) J.block(6,0,6,3).setZero();                     // Remove contribution of torso joints
 			
 			// Compute the joint and Cartesian inertia matrices
 			Eigen::MatrixXd M(6+this->n,6+this->n);                                  
@@ -578,39 +561,23 @@ void Humanoid::run()
 			Eigen::MatrixXd invM = inverse(M);                                         // Invert the inertia matrix
 			Eigen::MatrixXd A = inverse(J*invM*J.transpose());                         // Cartesian inertia matrix
 			
-			// Compute the bias forces
-			this->computer.generalizedBiasForces(this->generalForces);                 // Coriolis term
-			iDynTree::VectorDynSize biasForce = this->generalForces.jointTorques();    // Just the torque vector
-			Eigen::VectorXd c(this->n);                                                // Coriolis torque as Eigen::Vector
-			for(int i = 0; i < this->n; i++) c(i) = biasForce(i);                      // Transfer to Eigen class
-			
-			iDynTree::Vector6 bLeft = this->computer.getFrameBiasAcc("l_hand");        // Jdot*qdot for left hand
-			iDynTree::Vector6 bRight = this->computer.getFrameBiasAcc("r_hand");       // Jdot*qdot for right hand
-			Eigen::VectorXd b(12);                                                     // Combined Jdot*qdot
-			for(int i = 0; i < 6; i++)
-			{
-				b(i)   = bLeft(i);                                                 // Transfer the values
-				b(i+6) = bRight(i);
-			}
-	
-			Eigen::VectorXd bias = A*(J*invM*c - b);                                   // A*(J*invM*C - Jdot)*qdot
-			
 			// Solve the Cartesian control
 			iDynTree::VectorDynSize f(12); f.zero();                                   // Force vector to be computed
-			iDynTree::Transform pose;
-			iDynTree::Twist vel;
-			iDynTree::SpatialAcc acc;
-			iDynTree::Vector6 e; e.zero();
-			iDynTree::Vector6 edot; edot.zero();
+			iDynTree::Transform pose;                                                  // Desired pose for a hand
+			iDynTree::Twist vel;                                                       // Desired velocity for a hand
+			iDynTree::SpatialAcc acc;                                                  // Desired acceleration for a hand
+			iDynTree::Vector6 bias;                                                    // Bias acceleration Jdot*qdot
+			iDynTree::Vector6 e; e.zero();                                             // Pose error
+			iDynTree::Vector6 edot; edot.zero();                                       // Velocity error
 			
+			// Left hand is active, so compute feedforward + feedback control
 			if(this->leftControl)
 			{	
-				// Get the desired state
 				this->leftHandTrajectory.get_state(pose, vel, acc, elapsedTime);
-				
-				// Compute the tracking error
 				e = get_pose_error(pose, get_hand_pose("left"));
+				bias = this->computer.getFrameBiasAcc("l_hand");
 				
+				// Compute the velocity error
 				for(int i = 0; i < 6; i++)
 				{
 					for(int j = 0; j < 10; j++) edot(i) += J(i,j)*this->qdot(j);
@@ -619,28 +586,19 @@ void Humanoid::run()
 				// Compute the force vector
 				for(int i = 0; i < 6; i++)
 				{
-					for(int j = 0; j < 6; j++) f(i) += A(i,j)*acc(j) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
+					for(int j = 0; j < 6; j++) f(i) += A(i,j)*(acc(j)-bias(j)) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
 				}
 				
-			}
-			else
-			{
-				J.block(0,0,6,3).setZero();                                        // Remove contribution of torso joints
-	
-				for(int i = 0; i < 6; i++)
-				{
-					for(int j = 3; j < 10; j++) f(i) -= this->D(i,i)*J(i,j)*this->qdot(j); // Try and keep the hand
-				}
 			}
 			
+			// Right hand control is active, so compute feedforward + feedback control
 			if(this->rightControl)
 			{
-				// Get the desired state
 				this->rightHandTrajectory.get_state(pose, vel, acc, elapsedTime);
-				
-				// Compute the tracking error
 				e = get_pose_error(pose, get_hand_pose("right"));
+				bias = this->computer.getFrameBiasAcc("l_hand");
 				
+				// Compute the velocity error
 				for(int i = 0; i < 6; i++)
 				{
 					for(int j = 0; j < 10; j++)
@@ -653,95 +611,27 @@ void Humanoid::run()
 				// Compute the force fector
 				for(int i = 0; i < 6; i++)
 				{
-					for(int j = 0; j < 6; j++) f(i+6) += A(i+6,j+6)*acc(j) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
-				}
-			}
-			else
-			{
-				J.block(6,0,6,3).setZero();                                        // Remove the contribution from the torso joints
-				
-				for(int i = 0; i < 6; i++)
-				{
-					for(int j = 10; j < 17; j++) f(i+6) -= this->D(i,i)*J(i+6,j)*this->qdot(j);
+					for(int j = 0; j < 6; j++) f(i+6) += A(i+6,j+6)*(acc(j)-bias(j)) + this->K(i,j)*e(j) + this->D(i,j)*edot(j);
 				}
 			}
 
-			
 			// Solve the Cartesian impedance control
-//			Eigen::MatrixXd N = Eigen::MatrixXd::Identity() - J.transpose*A*J*invM;    // Null space projection matrix
-
+			Eigen::MatrixXd N = Eigen::MatrixXd::Identity(this->n, this->n) - J.transpose()*A*J*invM;
+			iDynTree::VectorDynSize tau_d(this->n);
+			for(int i = 0; i < 12; i++) tau_d(i) = get_penalty(i);
+			
+			std::cout << "\nPenalty terms: " << std::endl;
+			std::cout << tau_d.toString() << std::endl;
+			
 			for(int i = 0; i < this->n; i++)
 			{
-				for(int j = 0; j < 12; j++) tau(i) += J(j,i)*f(j);
-			}
-			
-			std::cout << "\nHere is the force vector:" << std::endl;
-			std::cout << f.toString() << std::endl;
-/*
-			// Compute the gravity compensation
-			this->computer.generalizedGravityForces(this->generalForces);
-			tau = this->generalForces.jointTorques();
-			
-			// Get the desired state from the trajectory
-			iDynTree::Transform x_d;                                                   // Desired pose
-			iDynTree::Twist xdot_d;                                                    // Desired velocity
-			iDynTree::SpatialAcc xddot_d;                                              // Desired acceleration
-			this->leftHandTrajectory.get_state(x_d, xdot_d, xddot_d, elapsedTime);     // Get the desired state
-			
-			// Get the actual state from the kinematics
-			iDynTree::Transform x = get_hand_pose("left");                             // Actual pose of the left hand
-			Eigen::MatrixXd J(6,6+this->n);
-			this->computer.getFrameFreeFloatingJacobian("l_hand",J);                   // Get the full Jacobian
-			J = J.block(0,6,6,10);                                                     // Just the left arm joints
-			
-			// Compute error terms for feedback control
-			iDynTree::Vector6 e = get_pose_error(x_d, x);                              // Pose error between desired and actual
-			iDynTree::Vector6 edot; edot.zero();                                       // Cartesian velocity error
-			
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < 10; j++) edot(i) += xdot_d(i) - J(i,j)*this->qdot(j);
-			}
-			
-			// Compute the feedback linearization term
-			Eigen::MatrixXd M(6+this->n, 6+this->n);
-			this->computer.getFreeFloatingMassMatrix(M);
-			M = M.block(6,6,10,10);                                                    // Just the inertia for the left hand
-			Eigen::MatrixXd invM = inverse(M);                                         // Inverse of the inertia matrix
-			Eigen::MatrixXd A = inverse(J*invM*J.transpose());                         // Cartesian inertia matrix of the left hand
-			this->computer.generalizedBiasForces(this->generalForces);
-			iDynTree::VectorDynSize h = this->generalForces.jointTorques();            // C*qdot + g
-			iDynTree::Vector6  b = this->computer.getFrameBiasAcc("l_hand");           // Jdot*qdot
-			
-			Eigen::MatrixXd temp = J*invM;
-			iDynTree::Vector6 c; c.zero();
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < 6; j++) c(i) = temp(i,j)*h(j);
-			}
-			
-			iDynTree::Vector6 fbl; fbl.zero();
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < 6; j++) fbl(i) = A(i,j)*(c(j) - b(j));
-			}
-			
-			// Compute the Cartesian force vector
-			iDynTree::Vector6 f; f.zero();
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < 6; j++)
+				for(int j = 0; j < this->n; j++)
 				{
-					f(i) += A(i,j)*xddot_d(j) + this->D(i,j)*edot(j) + this->K(i,j)*e(j) + fbl(j);
+					if(j < 12) tau(i) += J(j,i)*f(j);                          // Range space torques
+//					tau(i) += N(i,j)*tau_d;                                    // Null space torques
 				}
 			}
-			
-			// Add it to the joint torque vector
-			for(int i = 0; i < 6; i++)
-			{
-				for(int j = 0; j < 10; j++) tau(j) += J(i,j)*f(i);
-			}
-*/		
+
 			break;
 		}
 		default:
@@ -799,6 +689,25 @@ Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 	}
 	return invA;
 }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //	                 Get the penalty function for joint limit avoidance                       //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+double Humanoid::get_penalty(const int &j)
+{
+	double upper = this->qMax(j) - this->q(j);                                                 // Distance to upper limit
+	double lower = this->q(j) - this->qMin(j);                                                 // Distance from lower limit
+	double range = this->qMax(j) - this->qMin(j);                                              // Distance between limits
+	
+//	double p = range*range/(4*upper*lower);
+
+	double dpdq = range*range*(2*this->q(j) - this->qMax(j) - this->qMin(j))                   // Gradient
+	             /(4*upper*upper*lower*lower);
+	             
+	if(dpdq*this->qdot(j) > 0) return dpdq;
+	else                       return 0.0;
+}
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //			Prints out kinematic values for debugging purposes                        //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
