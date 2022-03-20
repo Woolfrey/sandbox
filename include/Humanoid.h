@@ -539,9 +539,6 @@ void Humanoid::run()
 		}
 		case cartesian:
 		{
-			this->computer.generalizedGravityForces(this->generalForces);              // Compute gravity torques
-			tau = this->generalForces.jointTorques();                                  // At a minimum, compensate for gravity       
-
 			// Generate the Jacobian
 			Eigen::MatrixXd J(12,this->n);                                             // Jacobian for both hands
 			Eigen::MatrixXd temp(6,6+this->n);                                         // Jacobian for a single hand
@@ -616,19 +613,21 @@ void Humanoid::run()
 			}
 
 			// Solve the Cartesian impedance control
+			this->computer.generalizedGravityForces(this->generalForces);              // Compute gravitational forces
+			iDynTree::VectorDynSize g = this->generalForces.jointTorques();            // Extract the gravity torques
 			Eigen::MatrixXd N = Eigen::MatrixXd::Identity(this->n, this->n) - J.transpose()*A*J*invM;
+			
 			iDynTree::VectorDynSize tau_d(this->n);
 			for(int i = 0; i < 12; i++) tau_d(i) = get_penalty(i);
 			
-			std::cout << "\nPenalty terms: " << std::endl;
-			std::cout << tau_d.toString() << std::endl;
-			
 			for(int i = 0; i < this->n; i++)
 			{
+				tau(i) += g(i);                                                    // Gravity compensation
+
 				for(int j = 0; j < this->n; j++)
 				{
 					if(j < 12) tau(i) += J(j,i)*f(j);                          // Range space torques
-//					tau(i) += N(i,j)*tau_d;                                    // Null space torques
+					tau(i) -= N(i,j)*(tau_d(j) + 2.0*this->qdot(j));           // Null space torques
 				}
 			}
 
@@ -640,15 +639,6 @@ void Humanoid::run()
 			tau = this->generalForces.jointTorques();
 			haiku();
 		}
-	}
-	
-	// Ensure joint torques aren't violated
-	this->computer.generalizedGravityForces(this->generalForces);
-	iDynTree::VectorDynSize g = this->generalForces.jointTorques();
-	for(int i = 0; i < this->n; i++)
-	{
-		if(tau[i] > 100 - g[i])       tau[i] = -100 - g[i];                                // Set max. torque at 100 Nm
-		else if(tau[i] < -100 - g[i]) tau[i] = -100 - g[i];                                // Set min. troque at -100 Nm
 	}
 
 	// Send the commands to the motors
@@ -699,11 +689,18 @@ double Humanoid::get_penalty(const int &j)
 	double lower = this->q(j) - this->qMin(j);                                                 // Distance from lower limit
 	double range = this->qMax(j) - this->qMin(j);                                              // Distance between limits
 	
-//	double p = range*range/(4*upper*lower);
+//	double p = range*range/(4*upper*lower);                                                    // This is the actual function but we don't need it
 
 	double dpdq = range*range*(2*this->q(j) - this->qMax(j) - this->qMin(j))                   // Gradient
 	             /(4*upper*upper*lower*lower);
 	             
+	// Cap the value if its too large
+	if(dpdq > 1e02)       dpdq =  1e02;
+	else if(dpdq < -1e02) dpdq = -1e02;
+	
+//	return dpdq;
+	
+	// Return penalty if moving toward a limit?
 	if(dpdq*this->qdot(j) > 0) return dpdq;
 	else                       return 0.0;
 }
