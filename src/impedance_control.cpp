@@ -4,17 +4,18 @@
  //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <Haiku.h>                                                                                 // A simple poem in the form of a haiku
+#include <CartesianTrajectory.h>
+#include <Haiku.h>                                                                                 // A simple poem in the form of a haiku/
 #include <Humanoid.h>                                                                              // Custom robot control class
-#include <JointConfigurationsiCub3.h>                                                              // Pre-programmed configurations for iCub3
+//#include <JointConfigurationsiCub3.h>                                                            // Pre-programmed configurations for iCub3
 #include <yarp/os/RpcServer.h>                                                                     // Ports for communicating with YARP
-
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                                MAIN                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
+/*
 	// Default for argc is 1, but I don't know why ¯\_(ツ)_/¯
 	if(argc != 2)									
 	{
@@ -107,5 +108,5 @@ int main(int argc, char *argv[])
 		std::cout << "[INFO] [IMPEDANCECONTROL] All done." << std::endl;
 		
 		return 0;                                                                          // No problems with main
-	}
+	}*/
 }
