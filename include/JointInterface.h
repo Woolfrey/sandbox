@@ -7,7 +7,7 @@
 #ifndef JOINTINTERFACE_H_
 #define JOINTINTERFACE_H_
 
-#include <iDynTree/Core/VectorDynSize.h>                                                           // iDynTree::VectorDynSize
+#include <math.h>                                                                                  // M_PI
 #include <string>                                                                                  // std::string
 #include <vector>                                                                                  // std::vector
 #include <yarp/dev/ControlBoardInterfaces.h>                                                       // I don't know what this does exactly...
@@ -21,15 +21,16 @@ class JointInterface
 
 		bool activate_control();                                                           // Activate the joint control	
 		bool read_encoders();                                                              // Update the joint states internally
-		bool send_torque_commands(const iDynTree::VectorDynSize &tau);                     // As it says on the label
+		bool send_torque_commands(const std::vector<double> &tau);                         // As it says on the label
 		void close();                                                                      // Close the device driver
 		
 	protected:
-		iDynTree::VectorDynSize q, qdot, qMin, qMax, vLim;
+		int n;                                                                             // Number of joints being controlled
+		std::vector<double> pos, vel;                                                      // Joint positions and velocities
+		std::vector<double> pMin, pMax, vMax;                                              // Position and velocity limits
 		
 	private:
 		bool isValid = true;                                                               // Won't do calcs if false
-		int n;                                                                             // Number of joints being controlled
 		
 	   	// These interface with the hardware
 		yarp::dev::IControlLimits*  limits;                                                // Joint limits?
@@ -46,12 +47,12 @@ class JointInterface
 JointInterface::JointInterface(const std::vector<std::string> &jointList):
                                n(jointList.size())
 {
-	// Resize arrays, vectors
-	q.resize(this->n);
-	qdot.resize(this->n);
-	qMin.resize(this->n);
-	qMax.resize(this->n);
-	vLim.resize(this->n);
+	// Resize std::vector objects
+	this->pos.resize(this->n);
+	this->vel.resize(this->n);
+	this->pMin.resize(this->n);
+	this->pMax.resize(this->n);
+	this->vMax.resize(this->n);
 	
 	// Open up device drivers
 	yarp::os::Property options;									
@@ -78,7 +79,8 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList):
 	
 	if(!this->driver.open(options))
 	{
-		std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: Could not open device driver." << std::endl;
+		std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: "
+			  << "Could not open device driver." << std::endl;
 		this->isValid &= false;
 	}
 	else
@@ -86,19 +88,22 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList):
 		// Try and configure the joint controllers
 		if(!this->driver.view(this->controller))
 		{
-			std::cout << "[ERROR] [JOINTINTERFACE] Constructor: Unable to configure the motor controllers." << std::endl;
+			std::cout << "[ERROR] [JOINTINTERFACE] Constructor: "
+				  << "Unable to configure the motor controllers." << std::endl;
 			this->isValid &= false;
 		}
 		else if(!this->driver.view(this->mode))
 		{
-			std::cerr << "[ERROR] [JOINTINTERFACE] Unable to configure the control mode." << std::endl;
+			std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: "
+				  << "Unable to configure the control mode." << std::endl;
 			this->isValid &= false;
 		}
 		
 		// Now try and obtain the joint limits
 		if(!this->driver.view(this->limits))
 		{
-			std::cerr << "[ERROR] [JOINTINTERFACE] Unable to obtain joint limits." << std::endl;
+			std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: "
+				  << "Unable to obtain joint limits." << std::endl;
 			this->isValid &= false;
 		}
 		else
@@ -106,20 +111,21 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList):
 			for(int i = 0; i < this->n; i++)
 			{
 				double notUsed;
-				this->limits->getLimits(i, &this->qMin[i], &this->qMax[i]);
-				this->limits->getVelLimits(i, &notUsed, &this->vLim[i]);
+				this->limits->getLimits(i, &this->pMin[i], &this->pMax[i]);
+				this->limits->getVelLimits(i, &notUsed, &this->vMax[i]);
 				
 				// Convert from degrees to radians
-				this->qMin[i] *= M_PI/180;
-				this->qMax[i] *= M_PI/180;
-				this->vLim[i] *= M_PI/180;
+				this->pMin[i] *= M_PI/180;
+				this->pMax[i] *= M_PI/180;
+				this->vMax[i] *= M_PI/180;
 			}
 		}
 		
 		// Finally, configure the encoders
 		if(!this->driver.view(this->encoders))
 		{
-			std::cerr << "[ERROR] [JOINTINTERFACE] Unable to configure the encoders." << std::endl;
+			std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: "
+				  << "Unable to configure the encoders." << std::endl;
 			this->isValid &= false;
 		}
 		else
@@ -132,17 +138,19 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList):
 				
 				if(i == 5)
 				{
-					std::cerr << "[ERROR] [JOINTINTERFACE] Could not obtain encoder values for in 5 attempts." << std::endl;
+					std::cerr << "[ERROR] [JOINTINTERFACE] Constructor: "
+						  << "Could not obtain encoder values for in 5 attempts." << std::endl;
 					this->isValid &= false;
 				}
 				yarp::os::Time::delay(0.05);
 			}
 			
-			for(int i = 0; i < this->n; i++) this->q[i] = temp[i]*M_PI/180;
+			for(int i = 0; i < this->n; i++) this->pos[i] = temp[i]*M_PI/180;
 		}
 	}
 	
-	if(this->isValid)	std::cout << "[INFO] [JOINTINTERFACE] Successfully configured the drivers." << std::endl;
+	if(this->isValid)	std::cout << "[INFO] [JOINTINTERFACE] Constructor: "
+					  << "Successfully configured the drivers." << std::endl;
 	else			this->driver.close();	
 }
 
@@ -154,18 +162,19 @@ bool JointInterface::read_encoders()
 	bool success = true;
 	for(int i = 0; i < this->n; i++)
 	{
-		success &= this->encoders->getEncoder(i, &this->q[i]);                             // Read the position
-		success &= this->encoders->getEncoderSpeed(i, &this->qdot[i]);                     // Read the velocity
+		success &= this->encoders->getEncoder(i, &this->pos[i]);                           // Read the position
+		success &= this->encoders->getEncoderSpeed(i, &this->vel[i]);                      // Read the velocity
 		
-		this->q[i] *= M_PI/180;                                                            // Convert to rad
-		this->qdot[i] *= M_PI/180;                                                         // Convert to rad/s
+		this->pos[i] *= M_PI/180;                                                          // Convert to rad
+		this->vel[i] *= M_PI/180;                                                          // Convert to rad/s
 		
 		// Sensor noise can give readings above or below limits so cap them
-		if(this->q[i] > this->qMax[i]) this->q[i] = this->qMax[i];
-		if(this->q[i] < this->qMin[i]) this->q[i] = this->qMin[i];
+		if(this->pos[i] > this->pMax[i]) this->pos[i] = this->pMax[i];
+		if(this->pos[i] < this->pMin[i]) this->pos[i] = this->pMin[i];
 	}
 
-	if(!success) std::cerr << "[ERROR] [JOINTINTERFACE] Could not obtain new encoder values." << std::endl;
+	if(!success) std::cerr << "[ERROR] [JOINTINTERFACE] read_encoders(): "
+			       << "Could not obtain new encoder values." << std::endl;
 	
 	return success;
 }
@@ -173,18 +182,20 @@ bool JointInterface::read_encoders()
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                Send torque commands to the joints                              //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &tau)
+bool JointInterface::send_torque_commands(const std::vector<double> &tau)
 {
 	if(!this->isValid)
 	{
-		std::cerr << "[ERROR] [JOINTINTERFACE] send_torque_commands() : There was a problem with the construction of this object. "
-			<< " Joint commands not sent." << std:: endl;
+		std::cerr << "[ERROR] [JOINTINTERFACE] send_torque_commands(): "
+			  << "There was a problem with the construction of this object. "
+			  << "Joint commands not sent." << std:: endl;
 		return false;
 	}
 	else if(tau.size() > this->n)
 	{
-		std::cerr << "[WARNING] [JOINTINERFACE] send_torque_commands() : Input vector has "
-			<< tau.size() << " elements but there are only " << this->n << " joints." << std::endl;
+		std::cerr << "[WARNING] [JOINTINERFACE] send_torque_commands(): "
+			  << "Input vector has " << tau.size() << " elements but there are only "
+			  << this->n << " joints." << std::endl;
 			
 		for(int i = 0; i < this->n; i++) this->controller->setRefTorque(i, tau[i]);
 		return false;
@@ -221,8 +232,9 @@ bool JointInterface::activate_control()
 	}
 	else
 	{
-		std::cerr << "[ERROR] [JOINTINTERFACE] activate_control() : There was a problem during the construction of this object. "
-			<< "Joint control not activated." << std::endl;
+		std::cerr << "[ERROR] [JOINTINTERFACE] activate_control() : "
+			  << "There was a problem during the construction of this object. "
+			  << "Joint control not activated." << std::endl;
 		return false;
 	}
 }

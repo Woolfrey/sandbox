@@ -7,104 +7,134 @@
 #ifndef CARTESIANTRAJECTORY_H_
 #define CARTESIANTRAJECTORY_H_
 
-#include <iDynTree/Core/GeomVector3.h>                                                             // iDynTree::GeomVector3
-#include <iDynTree/Core/Position.h>                                                                // iDynTree::Position
-#include <iDynTree/Core/Rotation.h>                                                                // iDynTree::Rotation
-#include <iDynTree/Core/SpatialAcc.h>                                                              // iDynTree::SpatialAcc
-#include <iDynTree/Core/Transform.h>                                                               // iDynTree::Transform
-#include <iDynTree/Core/Twist.h>                                                                   // iDynTree::Twist
-#include <iDynTree/Core/VectorDynSize.h>                                                           // iDynTree::VectorDynSize
-#include <QuinticRotation.h>                                                                       // Also includes Quintic.h
+#include <iDynTree/Core/CubicSpline.h>
+#include <iDynTree/Core/SpatialAcc.h>
+#include <iDynTree/Core/Transform.h>
+#include <iDynTree/Core/Twist.h>
 
 class CartesianTrajectory
 {
 	public:
-		CartesianTrajectory () {}                                                          // Empty constructor
+		CartesianTrajectory ();
 		
-		CartesianTrajectory(const iDynTree::Transform &startPose,
-				    const iDynTree::Transform &endPose,
-				    const double &startTime,
-				    const double &endTime);
-	
+		CartesianTrajectory(const std::vector<iDynTree::Transform> &waypoint,
+				    const std::vector<double> &time);
+				    
 		bool get_state(iDynTree::Transform &pose,
 			       iDynTree::Twist &vel,
 			       iDynTree::SpatialAcc &acc,
 			       const double &time);
 	private:
-		iDynTree::Transform T0;                                                            // Initial transform
-		Quintic translationTrajectory;                                                     // Translation trajectory
-		QuinticRotation rotationTrajectory;                                                // Rotation trajectory
+		bool isValid = true;                                                               // Won't do computations if this is false
+		int n;                                                                             // Number of waypoints
+		std::vector<iDynTree::CubicSpline> spline;                                         // Array of splines
 	
 };                                                                                                 // Semicolon needed after class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                                 A constructor for 2 poses                                      //
+ //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CartesianTrajectory::CartesianTrajectory(const iDynTree::Transform &startPose,
-					 const iDynTree::Transform &endPose,
-					 const double &startTime,
-					 const double &endTime):
-					 T0(startPose)
+CartesianTrajectory::CartesianTrajectory(const std::vector<iDynTree::Transform> &waypoint,
+				    	 const std::vector<double> &time)
 {
-	// Extract the positions and put them in to vectors
-	iDynTree::Position startPoint = startPose.getPosition();
-	iDynTree::Position endPoint = endPose.getPosition();
-	iDynTree::VectorDynSize p1(3), p2(3);
-	for(int i = 0; i < 3; i++)
+	// Check the inputs are sound
+	if(waypoint.size() != time.size())
 	{
-		p1[i] = startPoint[i];
-		p2[i] = endPoint[i];
-	}
-	
-	// Assign the translation and rotation trajectories
-	this->translationTrajectory = Quintic(p1, p2, startTime, endTime);
-	this->rotationTrajectory = QuinticRotation(startPose.getRotation(), endPose.getRotation(), startTime, endTime);
-}
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                     Get the desired Cartesian state for the given time                         //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
-				    iDynTree::Twist &vel,
-				    iDynTree::SpatialAcc &acc,
-				    const double &time)
-{
-	// Variables used in this scope
-	iDynTree::GeomVector3 linearVel, angularVel, linearAcc, angularAcc;
-	iDynTree::Position pos;
-	iDynTree::Rotation rot;
-	iDynTree::VectorDynSize p(3), v(3), a(3);                                                  // The base class uses VectorDynSize
-	
-	// Get the desired state from the trajectory objects
-	if( this->translationTrajectory.get_state(p, v, a, time)
-	and this->rotationTrajectory.get_state(rot, angularVel, angularAcc, time))
-	{	
-		// Transfer data from iDynTree to GeomVector3
-		for(int i = 0; i < 3; i++)
-		{
-			pos[i] = p[i];
-			linearVel[i] = v[i];
-			linearAcc[i] = a[i];
-		}
-		
-		// Put them in to the return values
-		pose.setPosition(pos);
-		pose.setRotation(rot);
-		vel = iDynTree::Twist(linearVel, angularVel);
-		acc = iDynTree::SpatialAcc(linearAcc, angularAcc);
-		return true;
+		std::cerr << "[ERROR] [CARTESIANTRAJECTORY] Constructor: "
+			  << "Vectors were not of equal length! "
+			  << "There were " << waypoint.size() << " waypoints and "
+			  << time.size() << " times." << std::endl;
+		this->isValid = false;
 	}
 	else
 	{
-		std::cerr << "[ERROR] [CARTESIANTRAJECTORY] get_state(): "
-			  << "Could not get the desired state." << std::endl;
+		// Check the times are in order
+		for(int i = 0; i < this->n-1; i++)
+		{
+			if(time[i] == time[i+1])
+			{
+				std::cerr << "[ERROR] [CARTESIANTRAJECTORY] Constructor: "
+					  << "Cannot move in zero time! "
+					  << "Time " << i+1 << " was " << time[i] << " seconds "
+					  << "and time " << i+2 << " was " << time[i+1] << " seconds." << std::endl;
+					  
+				this->isValid = false;
+				break;
+			}
+			else if(time[i] > time[i+1])
+			{
+				std::cerr << "[ERROR] [CARTESIANTRAJECTORY] Constructor: "
+					  << "Times are not in ascending order! "
+					  << "Time " << i+1 << " was " << time[i] << " seconds "
+					  << "and time " << i+2 << " was " << time[i+1] << " seconds." << std::endl;
+					  
+				this->isValid = false;
+				break;
+			}
+		}
 		
-		pose = this->T0;								   // Remain at the start
-		linearVel.zero(); angularVel.zero(); linearAcc.zero(); angularAcc.zero();	   // Don't move
-		vel = iDynTree::Twist(linearVel, angularVel);
-		acc = iDynTree::SpatialAcc(linearAcc, angularAcc);
-		return false;	
+		if(this->isValid)
+		{
+			std::vector<iDynTree::VectorDynSize> dim;                                   // Array of all positions and orientations
+			for(int i = 0; i < 6; i++) dim.push_back(iDynTree::VectorDynSize(this->n)); // Put an nx1 vector in each of the 6 dimensions
+			
+			iDynTree::VectorDynSize t(this->n);                                        // Vector of times for each waypoint
+			
+			for(int j = 0; j < this->n; j++)
+			{
+				t[j] = time[j];                                                    // Add time to the vector
+				
+				iDynTree::Position pos = waypoint[j].getPosition();                // Get the position for the jth waypoint
+				iDynTree::Vector3 rpy = waypoint[j].getRotation().asRPY();         // Get the RPY angles for the jth waypoint
+				
+				for(int i = 0; i < 3; i++)
+				{
+					dim[i][j]   = pos[i];                                      // Append position
+					dim[i+1][j] = rpy[i];                                      // Append rpy angles
+				}
+			}
+			
+			for(int i = 0; i < 6; i++)
+			{
+				// Try and create the CubicSpline object
+				if(not this->spline[i].setData(t, dim[i]))
+				{
+					std::cerr << "[ERROR] [CARTESIANTRAJECTORY] Constructor: "
+						  << "Could not create a spline for the dim " << i+1 << "." << std::endl;
+					this->isValid = false;
+					break;
+				}
+				else
+				{
+					this->spline[i].setInitialConditions(0.0, 0.0);            // Start from rest
+					this->spline[i].setFinalConditions(0.0, 0.0);              // End at rest
+				}
+			}
+		}	
 	}
 }
 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                          Get the desired state for the given time                              //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
+			       	    iDynTree::Twist &vel,
+			            iDynTree::SpatialAcc &acc,
+			            const double &time)
+{
+	iDynTree::Vector3 p, rpy;
+	iDynTree::GeomVector3 linearVel, angularVel, linearAcc, angularAcc; 
+	for(int i = 0; i < 3; i++)
+	{
+		p[i]   = this->spline[i].evaluatePoint(time, linearVel[i], linearAcc[i]);          // Evaluate the linear component
+		rpy[i] = this->spline[i].evaluatePoint(time, angularVel[i], angularAcc[i]);         // Evaluate the angular component
+	}
+	
+	pose.setPosition(iDynTree::Position(p[0], p[1], p[2]));                                    // Set the translation component
+	pose.setRotation(iDynTree::Rotation::RPY(p[3], p[4], p[5]));                               // Set the rotation component
+	vel = iDynTree::Twist(linearVel, angularVel);                                              // Set the velocities
+	acc = iDynTree::SpatialAcc(linearAcc, angularAcc);                                         // Set the accelerations
+	
+	return true;
+}
 #endif
