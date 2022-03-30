@@ -7,7 +7,7 @@
 #include <CartesianTrajectory.h>
 #include <Haiku.h>                                                                                 // A simple poem in the form of a haiku/
 #include <Humanoid.h>                                                                              // Custom robot control class
-//#include <JointConfigurationsiCub3.h>                                                            // Pre-programmed configurations for iCub3
+#include <JointConfigurationsiCub3.h>                                                            // Pre-programmed configurations for iCub3
 #include <yarp/os/RpcServer.h>                                                                     // Ports for communicating with YARP
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-/*
+
 	// Default for argc is 1, but I don't know why ¯\_(ツ)_/¯
 	if(argc != 2)									
 	{
@@ -69,16 +69,6 @@ int main(int argc, char *argv[])
 				robot.halt();                                                      // Stop any control threads, maintain current position
 				output.addString("Fermata");
 			}
-			else if(command == "test")
-			{
-				iDynTree::Transform T = robot.get_hand_pose("left");               // Get the left hand pose
-				iDynTree::Position p = T.getPosition();                            // Get the position
-				p[1] += 0.2;                                                       // Move to the right
-				T.setPosition(p);                                                  // Override
-//				T.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, 0.0));
-				if(robot.move_to_pose(T,"left")) output.addString("Testing");
-				else                             output.addString("Problema");
-			}
 			else if(command == "wave")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(wave));
@@ -86,17 +76,6 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				// List of waypoints to move through
-				std::vector<iDynTree::VectorDynSize> positions;
-				positions.push_back(iDynTree::VectorDynSize(hmmm));
-				positions.push_back(iDynTree::VectorDynSize(neutral));
-				
-				// List of times to reach each waypoint
-				std::vector<double> times;
-				times.push_back(2);
-				times.push_back(4);
-				
-				robot.move_to_positions(positions, times);
 				output.addString("Cosa");
 			}
 			
@@ -108,5 +87,5 @@ int main(int argc, char *argv[])
 		std::cout << "[INFO] [IMPEDANCECONTROL] All done." << std::endl;
 		
 		return 0;                                                                          // No problems with main
-	}*/
+	}
 }
