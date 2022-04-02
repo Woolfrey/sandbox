@@ -69,6 +69,12 @@ int main(int argc, char *argv[])
 				robot.halt();                                                      // Stop any control threads, maintain current position
 				output.addString("Fermata");
 			}
+			else if(command == "test")
+			{
+				iDynTree::Position distance(0.0, 0.2, 0.0);
+				robot.translate(distance, "l_hand");
+				output.addString("Testing");
+			}				
 			else if(command == "wave")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(wave));
