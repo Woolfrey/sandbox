@@ -54,10 +54,34 @@ int main(int argc, char *argv[])
 				robot.move_to_position(iDynTree::VectorDynSize(home));
 				output.addString("Casa");
 			}
+			else if(command == "in")
+			{
+				robot.translate(iDynTree::Position(0.0,-0.1,0.0),
+						iDynTree::Position(0.0, 0.1,0.0));
+				output.addString("In");
+			}
+			else if(command == "left")
+			{
+				robot.translate(iDynTree::Position(0.0,0.1,0.0),
+						iDynTree::Position(0.0,0.1,0.0));
+				output.addString("Sinistra");
+			}
+			else if(command == "out")
+			{
+				robot.translate(iDynTree::Position(0.0, 0.1,0.0),
+						iDynTree::Position(0.0,-0.1,0.0));
+				output.addString("Out");
+			}
 			else if(command == "receive")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(receive));
 				output.addString("Grazie");
+			}
+			else if(command == "right")
+			{
+				robot.translate(iDynTree::Position(0.0,-0.1,0.0),
+						iDynTree::Position(0.0,-0.1,0.0));
+				output.addString("Destra");
 			}
 			else if(command == "shake")
 			{
@@ -71,10 +95,17 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "test")
 			{
-				iDynTree::Position distance(0.0, 0.2, 0.0);
-				robot.translate(distance, "l_hand");
+				iDynTree::Transform T(iDynTree::Rotation::RPY(0,0,0),
+						      iDynTree::Position(0.3,0.2,0.8));
+				robot.move_to_pose(T, "l_hand");
 				output.addString("Testing");
-			}				
+			}
+			else if(command == "up")
+			{
+				robot.translate(iDynTree::Position(0.0, 0.0, 0.1),
+						iDynTree::Position(0.0, 0.0, 0.1));
+				output.addString("Su");
+			}
 			else if(command == "wave")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(wave));
