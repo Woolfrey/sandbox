@@ -49,6 +49,12 @@ int main(int argc, char *argv[])
 				output.addString("Arrivederci");
 				active = false;                                                    // This will break the 'while' loop
 			}
+			else if(command == "down")
+			{
+				robot.translate(iDynTree::Position(0.0, 0.0,-0.1),
+						iDynTree::Position(0.0, 0.0,-0.1));
+				output.addString("Down");
+			}
 			else if(command == "home")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(home));
@@ -72,6 +78,15 @@ int main(int argc, char *argv[])
 						iDynTree::Position(0.0,-0.1,0.0));
 				output.addString("Out");
 			}
+			else if(command == "ready")
+			{
+				iDynTree::Transform T1(iDynTree::Rotation::RPY(0,0,-0.2),
+						       iDynTree::Position(0.3,0.2,0.8));
+				iDynTree::Transform T2(iDynTree::Rotation::RPY(0,0,0.2),
+						       iDynTree::Position(0.3,-0.2,0.8));
+				robot.move_to_pose(T1,T2);
+				output.addString("Pronto");
+			}
 			else if(command == "receive")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(receive));
@@ -90,7 +105,7 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "stop")
 			{
-				robot.halt();                                                      // Stop any control threads, maintain current position
+				robot.halt();                                                      // Stop control threads, maintain position
 				output.addString("Fermata");
 			}
 			else if(command == "test")
