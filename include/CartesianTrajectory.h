@@ -7,11 +7,11 @@
 #ifndef CARTESIANTRAJECTORY_H_
 #define CARTESIANTRAJECTORY_H_
 
-#include <iDynTree/Core/CubicSpline.h>                                                             // Fundamental trajectory object
-#include <iDynTree/Core/SpatialAcc.h>                                                              // Linear and angular acceleration
-#include <iDynTree/Core/Transform.h>                                                               // Position and orientation
-#include <iDynTree/Core/Twist.h>                                                                   // Linear and angular velocity
-#include <vector>                                                                                  // std::vector
+#include <iDynTree/Core/CubicSpline.h>                                                              // Fundamental trajectory object
+#include <iDynTree/Core/SpatialAcc.h>                                                               // Linear and angular acceleration
+#include <iDynTree/Core/Transform.h>                                                                // Position and orientation
+#include <iDynTree/Core/Twist.h>                                                                    // Linear and angular velocity
+#include <vector>                                                                                   // std::vector
 
 class CartesianTrajectory
 {
@@ -26,12 +26,12 @@ class CartesianTrajectory
 			       iDynTree::SpatialAcc &acc,
 			       const double &time);
 	private:
-		bool isValid = false;                                                              // Won't do computations if this is false
-		int n;                                                                             // Number of waypoints
-		std::vector<iDynTree::CubicSpline> spline;                                         // Array of splines
+		bool isValid = false;                                                               // Won't do computations if this is false
+		int n;                                                                              // Number of waypoints
+		std::vector<iDynTree::CubicSpline> spline;                                          // Array of splines
 		bool times_are_sound(const iDynTree::VectorDynSize &time);
 	
-};                                                                                                 // Semicolon needed after class declaration
+};                                                                                                  // Semicolon needed after class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //

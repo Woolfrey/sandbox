@@ -60,9 +60,23 @@ class Humanoid : public yarp::os::PeriodicThread,
 		bool update_state();                                                               // Update the joint states
 						 
 		void halt();                                                                       // Stop the robot immediately
+		
+		void grasp()
+		{
+			this->grasping = true;
+			move_to_pose(this->computer.getWorldTransform("left"), this->computer.getWorldTransform("right"));
+		}
+		
+		void release()
+		{
+			this->grasping = false;
+		}
+		
+		bool grasping = false;
+		enum ControlMode {joint, cartesian} controlMode;		
 	private:
 		double dt = 0.01;                                                                  // Default control frequency
-		enum ControlSpace {joint, cartesian, dual} controlSpace;
+
 		iDynTree::VectorDynSize q, qdot;                                                   // Joint position and velocities
 		
 		// Joint control
@@ -191,12 +205,13 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &desired, const std::strin
 		std::cerr << "[ERROR] [HUMANOID] move_to_pose(): "
 			  << "Expected 'left or 'right' as an argument, "
 			  << "but your input was " << whichHand << "." << std::endl;
+			  
 		return false;
 	}
 	else
 	{
 		if(isRunning()) stop();                                                            // Stop any control threads that are running
-		this->controlSpace = cartesian;                                                    // Switch to Cartesian control mode
+		this->controlMode = cartesian;                                                    // Switch to Cartesian control mode
 		
 		iDynTree::VectorDynSize times(2); times(0) = 0.0; times(1) = 2.0;                  // Set up times for the trajectory object
 		
@@ -232,7 +247,7 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &left,
 			    const iDynTree::Transform &right)
 {
 	if(isRunning()) stop();                                                                    // Stop any control threads that are running
-	this->controlSpace = cartesian;                                                            // Switch to Cartesian control mode
+	this->controlMode = cartesian;                                                             // Switch to Cartesian control mode
 	
 	this->leftControl = true; this->rightControl = true;                                       // Activate control of both hands
 	
@@ -288,7 +303,7 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 				 const iDynTree::VectorDynSize &times)
 {
 	if(isRunning()) stop();                                                                    // Stop any control threads that are running
-	this->controlSpace = joint;                                                                // Switch to joint control
+	this->controlMode = joint;                                                                // Switch to joint control
 	
 	bool allGood;
 	int m = positions.size() + 1;                                                              // 1 extra waypoint for starting position
@@ -428,7 +443,7 @@ void Humanoid::run()
 	double elapsedTime = yarp::os::Time::now() - this->startTime;                              // Get elapsed time since start
 	iDynTree::VectorDynSize tau(this->n);                                                      // We want to compute this
 	
-	switch(this->controlSpace)
+	switch(this->controlMode)
 	{
 		case joint:
 		{
@@ -462,35 +477,58 @@ void Humanoid::run()
 		case cartesian:
 		{
 			// Generate the Jacobian
-			Eigen::MatrixXd J(12,this->n);                                             // Jacobian for both hands
-			Eigen::MatrixXd temp(6,6+this->n);                                         // Jacobian for a single hand
+			Eigen::MatrixXd J(12,this->n);                                              // Jacobian for both hands
+			Eigen::MatrixXd temp(6,6+this->n);                                          // Jacobian for a single hand
 			
-			this->computer.getFrameFreeFloatingJacobian("left", temp);                 // Get the full left hand Jacobian
-			J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign to the larger Jacobian
-			if(not this->leftControl) J.block(0,0,6,3).setZero();                      // Remove contribution of torso joints
+			this->computer.getFrameFreeFloatingJacobian("left", temp);                  // Get the full left hand Jacobian
+			J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                         // Assign to the larger Jacobian
+			if(not this->leftControl) J.block(0,0,6,3).setZero();                       // Remove contribution of torso joints
 			
-			this->computer.getFrameFreeFloatingJacobian("right", temp);                // Get the full right hand Jacobian
-			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                        // Assign the right hand Jacobian
-			if(not this->rightControl) J.block(6,0,6,3).setZero();                     // Remove contribution of torso joints
+			this->computer.getFrameFreeFloatingJacobian("right", temp);                 // Get the full right hand Jacobian
+			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                         // Assign the right hand Jacobian
+			if(not this->rightControl) J.block(6,0,6,3).setZero();                      // Remove contribution of torso joints
 			
-			Eigen::MatrixXd Jt = J.transpose();                                        // Makes things a little easier later
+			Eigen::MatrixXd Jt = J.transpose();                                         // Makes things a little easier later
 			
 			// Compute the joint and Cartesian inertia matrices
-			Eigen::MatrixXd M(6+this->n,6+this->n);                                    // Storage location
-			this->computer.getFreeFloatingMassMatrix(M);                               // Inertia including floating base
-			M = M.block(6,6,this->n,this->n);                                          // Remove the floating base part
-			Eigen::MatrixXd invM = inverse(M);                                         // Invert the inertia matrix
-			Eigen::MatrixXd A = inverse(J*invM*Jt);                                    // Cartesian inertia matrix
+			Eigen::MatrixXd M(6+this->n,6+this->n);                                     // Storage location
+			this->computer.getFreeFloatingMassMatrix(M);                                // Inertia including floating base
+			M = M.block(6,6,this->n,this->n);                                           // Remove the floating base part
+			Eigen::MatrixXd invM = inverse(M);                                          // Invert the inertia matrix
+			Eigen::MatrixXd A = inverse(J*invM*Jt);                                     // Cartesian inertia matrix
 			
 			// Solve the Cartesian force control
 			Eigen::VectorXd f(12); f.setZero();
 			if(this->leftControl)  f.block(0,0,6,1) = solve_force_control("left", A.block(0,0,6,6), elapsedTime);
 			if(this->rightControl) f.block(6,0,6,1) = solve_force_control("right", A.block(6,6,6,6), elapsedTime);
+			
+			if(this->grasping)
+			{
+				iDynTree::Transform L = this->computer.getWorldTransform("left");
+				iDynTree::Transform R = this->computer.getWorldTransform("right");
+				
+				iDynTree::Position ep = R.getPosition() - L.getPosition();
+				
+				iDynTree::Vector3 eo = (R.getRotation()*L.getRotation().inverse()).asRPY();
+				
+				for(int i = 0; i < 3; i++)
+				{
+					f(i)   +=  12*ep(i);
+					f(i+6) -=  12*ep(i);
+				}
+				
+				f(3) += 8*eo(0);
+				f(4) += 8*eo(1);
+				f(5) -= 0.05;
+				f(9) -= 8*eo(0);
+				f(10)-= 8*eo(1);
+				f(11)+= 0.05;
+			}
 
-			Eigen::VectorXd tau_R = Jt*f;                                              // Range space task
+			Eigen::VectorXd tau_R = Jt*f;                                               // Range space task
 			
 			// Compute the desired torques and null space task
-			Eigen::VectorXd tau_d(this->n);                                            // Desired torque
+			Eigen::VectorXd tau_d(this->n);                                             // Desired torque
 			for(int i = 0; i < this->n; i++)
 			{
 				tau_d(i) = -get_penalty(i) - this->kd*this->qdot[i];
@@ -550,8 +588,8 @@ void Humanoid::run()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void Humanoid::threadRelease()
 {
-	this->computer.generalizedGravityForces(this->generalForces);                              // Get the torque needed to withstand gravity
-//	send_torque_commands(this->generalForces.jointTorques());                                  // Send to the robot
+	this->computer.generalizedGravityForces(this->generalForces);                               // Get the torque needed to withstand gravity
+//	send_torque_commands(this->generalForces.jointTorques());                                   // Send to the robot
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -593,8 +631,8 @@ Eigen::VectorXd Humanoid::solve_force_control(const std::string &whichHand,
 			e(i+3) = rotError(i);
 		}
 		
-		Eigen::VectorXd xdot(6); this->computer.getFrameVel(whichHand, xdot);              // Actual velocity of the hand
-		Eigen::VectorXd bias(6); this->computer.getFrameBiasAcc(whichHand, bias);          // Jdot*qdot
+		Eigen::VectorXd xdot(6); this->computer.getFrameVel(whichHand, xdot);               // Actual velocity of the hand
+		Eigen::VectorXd bias(6); this->computer.getFrameBiasAcc(whichHand, bias);           // Jdot*qdot
 		
 		return A*(xddot_d - bias) + this->D*(xdot_d - xdot) + this->K*e;
 	}
@@ -606,11 +644,11 @@ Eigen::VectorXd Humanoid::solve_force_control(const std::string &whichHand,
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 {
-	Eigen::JacobiSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeFullU | Eigen::ComputeFullV);       // Get the SVD decomposition
-	Eigen::MatrixXd V = SVD.matrixV();                                                         // V matrix
-	Eigen::MatrixXd U = SVD.matrixU();                                                         // U matrix
-	Eigen::VectorXd s = SVD.singularValues();                                                  // Get the singular values
-	Eigen::MatrixXd invA(A.cols(), A.rows()); invA.setZero();                                  // Value we want to return
+	Eigen::JacobiSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeFullU | Eigen::ComputeFullV);        // Get the SVD decomposition
+	Eigen::MatrixXd V = SVD.matrixV();                                                          // V matrix
+	Eigen::MatrixXd U = SVD.matrixU();                                                          // U matrix
+	Eigen::VectorXd s = SVD.singularValues();                                                   // Get the singular values
+	Eigen::MatrixXd invA(A.cols(), A.rows()); invA.setZero();                                   // Value we want to return
 	
 	for(int i = 0; i < A.cols(); i++)
 	{
@@ -618,8 +656,8 @@ Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 		{
 			for(int k = 0; k < A.rows(); k++)
 			{
-				if(s(j) >= 1e-04)	invA(i,k) += (V(i,j)*U(k,j))/s(j);         // Fast inverse
-//				else			invA(i,k) += 0;                            // Ignore singular directions
+				if(s(j) >= 1e-04)	invA(i,k) += (V(i,j)*U(k,j))/s(j);          // Fast inverse
+//				else			invA(i,k) += 0;                             // Ignore singular directions
 			}
 		}
 	}
@@ -631,13 +669,13 @@ Eigen::MatrixXd Humanoid::inverse(const Eigen::MatrixXd &A)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 double Humanoid::get_penalty(const int &j)
 {
-	double upper = this->pMax[j] - this->q(j);                                                 // Distance to upper limit
-	double lower = this->q(j) - this->pMin[j];                                                 // Distance from lower limit
-	double range = this->pMax[j] - this->pMin[j];                                              // Distance between limits
+	double upper = this->pMax[j] - this->q(j);                                                  // Distance to upper limit
+	double lower = this->q(j) - this->pMin[j];                                                  // Distance from lower limit
+	double range = this->pMax[j] - this->pMin[j];                                               // Distance between limits
 	
-//	double p = range*range/(4*upper*lower);                                                    // This is the actual function but we don't need it
+//	double p = range*range/(4*upper*lower);                                                     // This is the actual function but we don't need it
 
-	double dpdq = range*range*(2*this->q(j) - this->pMax[j] - this->pMin[j])                   // Gradient
+	double dpdq = range*range*(2*this->q(j) - this->pMax[j] - this->pMin[j])                    // Gradient
 	             /(4*upper*upper*lower*lower);
 	             
 	// Cap the value if its too large

@@ -55,6 +55,11 @@ int main(int argc, char *argv[])
 						iDynTree::Position(0.0, 0.0,-0.1));
 				output.addString("Down");
 			}
+			else if(command == "grasp")
+			{
+				robot.grasp();
+				output.addString ("Grasping");
+			}
 			else if(command == "home")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(home));
@@ -81,9 +86,9 @@ int main(int argc, char *argv[])
 			else if(command == "ready")
 			{
 				iDynTree::Transform T1(iDynTree::Rotation::RPY(0,0,-0.2),
-						       iDynTree::Position(0.3,0.2,0.8));
+						       iDynTree::Position(0.3,0.23,0.75));
 				iDynTree::Transform T2(iDynTree::Rotation::RPY(0,0,0.2),
-						       iDynTree::Position(0.3,-0.2,0.8));
+						       iDynTree::Position(0.3,-0.23,0.75));
 				robot.move_to_pose(T1,T2);
 				output.addString("Pronto");
 			}
@@ -91,6 +96,11 @@ int main(int argc, char *argv[])
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(receive));
 				output.addString("Grazie");
+			}
+			else if(command == "release")
+			{
+				robot.release();
+				output.addString("Release");
 			}
 			else if(command == "right")
 			{
