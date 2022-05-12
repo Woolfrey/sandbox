@@ -3,15 +3,14 @@
 
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  ../include/CartesianTrajectory.h
- ../include/Cubic.h
- ../include/CubicRotation.h
  ../include/Haiku.h
  ../include/Humanoid.h
+ ../include/JointConfigurationsiCub3.h
  ../include/JointInterface.h
- ../include/Quintic.h
- ../include/QuinticRotation.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/ArticulatedBodyInertia.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/CoreExport.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/CubicSpline.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/EigenHelpers.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/GeomVector3.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/MatrixDynSize.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/MatrixFixSize.h
@@ -22,6 +21,7 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/RotationRaw.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/RotationalInertiaRaw.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Span.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SparseMatrix.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SpatialAcc.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SpatialForceVector.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SpatialInertia.h
@@ -30,6 +30,7 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SpatialMotionVector.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/SpatialVector.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Transform.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Triplets.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Twist.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/Utils.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/VectorDynSize.h
@@ -88,6 +89,7 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PidEnums.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PolyDriver.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/api.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/AbstractContactable.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Bottle.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/BufferedPort-inl.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/BufferedPort.h
@@ -123,6 +125,7 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Portable.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Property.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/QosStyle.h
+ /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/RpcServer.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Searchable.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/SystemClock.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Thread.h
@@ -138,7 +141,19 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Vocab.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/api.h
  /home/woolfrey/workspace/sandbox/src/impedance_control.cpp
+ /usr/include/eigen3/Eigen/Cholesky
  /usr/include/eigen3/Eigen/Core
+ /usr/include/eigen3/Eigen/Dense
+ /usr/include/eigen3/Eigen/Eigenvalues
+ /usr/include/eigen3/Eigen/Geometry
+ /usr/include/eigen3/Eigen/Householder
+ /usr/include/eigen3/Eigen/Jacobi
+ /usr/include/eigen3/Eigen/LU
+ /usr/include/eigen3/Eigen/QR
+ /usr/include/eigen3/Eigen/SVD
+ /usr/include/eigen3/Eigen/src/Cholesky/LDLT.h
+ /usr/include/eigen3/Eigen/src/Cholesky/LLT.h
+ /usr/include/eigen3/Eigen/src/Cholesky/LLT_LAPACKE.h
  /usr/include/eigen3/Eigen/src/Core/Array.h
  /usr/include/eigen3/Eigen/src/Core/ArrayBase.h
  /usr/include/eigen3/Eigen/src/Core/ArrayWrapper.h
@@ -270,7 +285,62 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /usr/include/eigen3/Eigen/src/Core/util/ReenableStupidWarnings.h
  /usr/include/eigen3/Eigen/src/Core/util/StaticAssert.h
  /usr/include/eigen3/Eigen/src/Core/util/XprHelper.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/ComplexEigenSolver.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/ComplexSchur.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/EigenSolver.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/HessenbergDecomposition.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/RealQZ.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/RealSchur.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/RealSchur_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/Eigenvalues/Tridiagonalization.h
+ /usr/include/eigen3/Eigen/src/Geometry/AlignedBox.h
+ /usr/include/eigen3/Eigen/src/Geometry/AngleAxis.h
+ /usr/include/eigen3/Eigen/src/Geometry/EulerAngles.h
+ /usr/include/eigen3/Eigen/src/Geometry/Homogeneous.h
+ /usr/include/eigen3/Eigen/src/Geometry/Hyperplane.h
+ /usr/include/eigen3/Eigen/src/Geometry/OrthoMethods.h
+ /usr/include/eigen3/Eigen/src/Geometry/ParametrizedLine.h
+ /usr/include/eigen3/Eigen/src/Geometry/Quaternion.h
+ /usr/include/eigen3/Eigen/src/Geometry/Rotation2D.h
+ /usr/include/eigen3/Eigen/src/Geometry/RotationBase.h
+ /usr/include/eigen3/Eigen/src/Geometry/Scaling.h
+ /usr/include/eigen3/Eigen/src/Geometry/Transform.h
+ /usr/include/eigen3/Eigen/src/Geometry/Translation.h
+ /usr/include/eigen3/Eigen/src/Geometry/Umeyama.h
+ /usr/include/eigen3/Eigen/src/Geometry/arch/Geometry_SSE.h
+ /usr/include/eigen3/Eigen/src/Householder/BlockHouseholder.h
+ /usr/include/eigen3/Eigen/src/Householder/Householder.h
+ /usr/include/eigen3/Eigen/src/Householder/HouseholderSequence.h
+ /usr/include/eigen3/Eigen/src/Jacobi/Jacobi.h
+ /usr/include/eigen3/Eigen/src/LU/Determinant.h
+ /usr/include/eigen3/Eigen/src/LU/FullPivLU.h
+ /usr/include/eigen3/Eigen/src/LU/InverseImpl.h
+ /usr/include/eigen3/Eigen/src/LU/PartialPivLU.h
+ /usr/include/eigen3/Eigen/src/LU/PartialPivLU_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/LU/arch/Inverse_SSE.h
+ /usr/include/eigen3/Eigen/src/QR/ColPivHouseholderQR.h
+ /usr/include/eigen3/Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/QR/CompleteOrthogonalDecomposition.h
+ /usr/include/eigen3/Eigen/src/QR/FullPivHouseholderQR.h
+ /usr/include/eigen3/Eigen/src/QR/HouseholderQR.h
+ /usr/include/eigen3/Eigen/src/QR/HouseholderQR_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/SVD/BDCSVD.h
+ /usr/include/eigen3/Eigen/src/SVD/JacobiSVD.h
+ /usr/include/eigen3/Eigen/src/SVD/JacobiSVD_LAPACKE.h
+ /usr/include/eigen3/Eigen/src/SVD/SVDBase.h
+ /usr/include/eigen3/Eigen/src/SVD/UpperBidiagonalization.h
+ /usr/include/eigen3/Eigen/src/misc/Image.h
+ /usr/include/eigen3/Eigen/src/misc/Kernel.h
+ /usr/include/eigen3/Eigen/src/misc/RealSvd2x2.h
  /usr/include/eigen3/Eigen/src/misc/blas.h
+ /usr/include/eigen3/Eigen/src/misc/lapacke.h
+ /usr/include/eigen3/Eigen/src/misc/lapacke_mangling.h
  /usr/include/eigen3/Eigen/src/plugins/ArrayCwiseBinaryOps.h
  /usr/include/eigen3/Eigen/src/plugins/ArrayCwiseUnaryOps.h
  /usr/include/eigen3/Eigen/src/plugins/BlockMethods.h

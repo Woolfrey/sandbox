@@ -84,8 +84,9 @@ class Humanoid : public yarp::os::PeriodicThread,
 		Eigen::Matrix<double,6,6> K, D;
 		
 		// Grasping
-		Eigen::MatrixXd Gleft = Eigen::MatrixXd::Identity(6,6);
-		Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
+		Eigen::Matrix<double,6,12> G;
+//		Eigen::Matrix<double,6,12> Gconst;
+		Eigen::Matrix<double,12,12> Gconst;
 		
 		// Kinematics & dynamics
 		iDynTree::FreeFloatingGeneralizedTorques generalForces;                             // Forces and torques		
@@ -213,22 +214,49 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left,
 	{
 		while(yarp::os::Time::now() - this->startTime < 3.0);                               // Do nothing while we wait
 		
-		// Set up the left grasp matrix
-		iDynTree::Transform T = this->computer.getWorldTransform("left");
-		iDynTree::Position p = object.getPosition() - T.getPosition();
-		this->Gleft.block(3,0,3,3) <<     0, -p(2),  p(1),
-                                               p(2),     0, -p(0),
-                                              -p(1),  p(0),     0;
-                                              
-		// Set up the right grasp matrix
+		// Variables used in this scope
+		iDynTree::Transform T;
+		iDynTree::Position p;
+		Eigen::MatrixXd Gleft  = Eigen::MatrixXd::Identity(6,6);
+		Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
+		
+		// Grasping matrix for the left hand
+		T = this->computer.getWorldTransform("left");
+		p = object.getPosition() - T.getPosition();
+		
+		Gleft.block(3,0,3,3) <<    0, -p(2),  p(1),
+		                        p(2),     0, -p(0),
+		                       -p(1),  p(0),     0;
+		                       
+		// Grasping matrix for the right hand
 		T = this->computer.getWorldTransform("right");
 		p = object.getPosition() - T.getPosition();
-		this->Gright.block(3,0,3,3) <<     0, -p(2),  p(1),
-                                                p(2),     0, -p(0),
-                                               -p(1),  p(0),     0;
 		
+		Gright.block(3,0,3,3) <<   0, -p(2),  p(1),
+		                        p(2),     0, -p(0),
+		                       -p(1),  p(0),     0;
+		                       
+		// Set new grasping matrices
+		this->G.block(0,0,6,6) = Gleft;
+		this->G.block(0,6,6,6) = Gright;
+		
+//		this->Gconst.block(0,0,6,6) = (Gleft.inverse()).transpose();
+//		this->Gconst.block(0,6,6,6) =-(Gright.inverse()).transpose();
+
+		this->Gconst = Eigen::MatrixXd::Identity(12,12) - G.transpose()*(G*G.transpose()).inverse()*G;
+
+/*		
+		std::cout << "\nHere is the grasp matrix:" << std::endl;
+		std::cout << this->G << std::endl;
+		std::cout << "\nHere is the grasp constraint matrix:" << std::endl;
+		std::cout << this->Gconst << std::endl;
+		std::cout << "\nHere is G*Gconst.transpose():" << std::endl;
+		std::cout << this->G*this->Gconst.transpose() << std::endl;
+*/	
+
 		this->controlMode = grasp;
-			
+		start();
+					
 		return true;
 	}
 
@@ -567,11 +595,11 @@ void Humanoid::run()
 				}
 				
 				// Limit the range space task
-				if(qddot_R[i] > this->aMax[i])      qddot_R[i] = 0.9*this->aMax[i];
+				if     (qddot_R[i] > this->aMax[i]) qddot_R[i] = 0.9*this->aMax[i];
 				else if(qddot_R[i] < this->aMin[i]) qddot_R[i] = 0.9*this->aMin[i];
 				
 				// Limit the null space task
-				if(qddot_N[i] > this->aMax[i] - qddot_R[i])      qddot_N[i] = this->aMax[i] - qddot_R[i];
+				if     (qddot_N[i] > this->aMax[i] - qddot_R[i]) qddot_N[i] = this->aMax[i] - qddot_R[i];
 				else if(qddot_N[i] < this->aMin[i] - qddot_R[i]) qddot_N[i] = this->aMin[i] - qddot_R[i];
 			}
 			
@@ -594,37 +622,52 @@ void Humanoid::run()
 			Eigen::MatrixXd M(6+this->n,6+this->n);                                     // Storage location
 			this->computer.getFreeFloatingMassMatrix(M);                                // Inertia including floating base
 			M = M.block(6,6,this->n,this->n);                                           // Remove the floating base part
-			Eigen::MatrixXd invM = inverse(M);                                          // This is needed a few times
+			Eigen::MatrixXd invM = M.inverse();                                         // This is needed a few times
 			this->computer.generalizedBiasForces(this->generalForces);                  // Coriolis and gravity forces
-			Eigen::VectorXd coriolisAndGravity = iDynTree::toEigen(this->generalForces.jointTorques());		
+			Eigen::VectorXd h = iDynTree::toEigen(this->generalForces.jointTorques());
 			
-			// Generate the Jacobians
-			Eigen::MatrixXd temp(6,6+this->n);                                          // Temporary placeholder
+			// Compute the Jacobians
+			Eigen::MatrixXd temp(6,6+this->n);                                          // Floating base Jacobian
+			Eigen::MatrixXd J(12,this->n);                                              // Jacobian for both arms (without base)
 			
 			this->computer.getFrameFreeFloatingJacobian("left",temp);
-			Eigen::MatrixXd Jleft = temp.block(0,6,6,this->n);                          // Left hand
-			
-			this->computer.getFrameFreeFloatingJacobian("right",temp);
-			Eigen::MatrixXd Jright = temp.block(0,6,6,this->n);                         // Right hand
-			
-			Eigen::MatrixXd Jc = this->Gleft.transpose()*Jleft
-			                   - this->Gright.transpose()*Jright;                       // Constraint
-			
-			// Solve the constraint forces
-			iDynTree::Vector6 e = get_pose_error(this->computer.getWorldTransform("right"),
-							     this->computer.getWorldTransform("left"));	    
-							     
-			Eigen::VectorXd fc(6); fc << 0, -5, 0, 5*e(3), 5*e(4), 5*e(5);
-			
-			// Solve the motion forces
-			
-			// Compute the joint torque
-			for(int j = 0; j < this->n; j++)
-			{
-				for(int i = 0; i < 6; i++) tau(j) += Jc(i,j)*fc(i);                 // Add constraint forces
+			J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                         // Assign to the larger Jacobian
 				
-				tau(j) += coriolisAndGravity(j);
-			}
+			this->computer.getFrameFreeFloatingJacobian("right", temp);                 // Get the full right hand Jacobian
+			J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                         // Assign the right hand Jacobian
+			
+			Eigen::MatrixXd Jc = this->Gconst*J;                                        // Constraint Jacobian
+			
+			// Compute the constraint forces
+			Eigen::MatrixXd JcinvM = Jc*invM;                                           // Makes calcs a little simpler
+			Eigen::MatrixXd Ac = inverse(JcinvM*Jc.transpose());                        // Inertia at constraint point
+			Eigen::MatrixXd V = Jc.transpose()*Ac*JcinvM;                               // Makes calcs a little easier
+			Eigen::MatrixXd Nc = Eigen::MatrixXd::Identity(this->n,this->n) - V;        // Null space projection matrix
+			Eigen::VectorXd hc = V*h;
+			
+			iDynTree::Vector6 e = get_pose_error(this->computer.getWorldTransform("right"),
+							     this->computer.getWorldTransform("left"));
+							     
+//			Eigen::VectorXd fc(6); fc << 0, -5, 0, e(3), e(4), e(5);
+
+			Eigen::VectorXd fc(12); fc << 0, -5, 0,  e(3),  e(4),  e(5),
+			                              0,  5, 0, -e(3), -e(4), -e(5);
+			                              
+			Eigen::VectorXd tau_c = Jc.transpose()*fc;
+			/*			
+			std::cout << "Here is the constraint force:" << std::endl;
+			std::cout << fc << std::endl;
+			std::cout << "Here are the hand forces:" << std::endl;
+			std::cout << this->Gconst.transpose()*fc << std::endl;
+			*/
+			
+			// Compute the Manipulation Forces
+			Eigen::MatrixXd Au = inverse(J*Nc*invM*J.transpose());
+			Eigen::VectorXd hu = Nc.transpose()*h;
+			
+			
+
+			for(int i = 0; i < this->n; i++) tau(i) += h(i) + tau_c(i);
 			
 			break;
 		}

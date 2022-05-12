@@ -58,13 +58,13 @@ int main(int argc, char *argv[])
 			else if(command == "grasp")
 			{
 				iDynTree::Transform object(iDynTree::Rotation::RPY(0,0,0),          // Pose of object
-				                           iDynTree::Position(0.4, 0, 0.66));
+				                           iDynTree::Position(0.4, 0, 0.68));
 				                           
 				iDynTree::Transform left(iDynTree::Rotation::RPY(0,0,0),            // Left hand grasp pose
-				                         iDynTree::Position(0.3, 0.15, 0.75));
+				                         iDynTree::Position(0.3, 0.15, 0.70));
 				
 				iDynTree::Transform right(iDynTree::Rotation::RPY(0,0,0),           // Right hand grasp pose
-                                                          iDynTree::Position(0.3, -0.15, 0.75));
+                                                          iDynTree::Position(0.3, -0.15, 0.70));
                                                       
 				robot.grasp_object(left, right, object);
 				
