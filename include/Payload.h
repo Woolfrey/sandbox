@@ -13,7 +13,7 @@
 class Payload
 {
 	public:
-		Payload();
+		Payload() {}
 		
 	private:
 	

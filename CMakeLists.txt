@@ -29,4 +29,7 @@ add_executable(haiku src/haiku.cpp)
 add_executable(impedance_control src/impedance_control.cpp)
 target_link_libraries(impedance_control Eigen3::Eigen iDynTree::idyntree-high-level ${YARP_LIBRARIES})
 
+add_executable(grasp_control src/grasp_control.cpp)
+target_link_libraries(grasp_control Eigen3::Eigen iDynTree::idyntree-high-level ${YARP_LIBRARIES})
+
 icubcontrib_add_uninstall_target()					# Enables uninstall

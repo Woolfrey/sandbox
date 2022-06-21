@@ -157,6 +157,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named grasp_control
+
+# Build rule for target.
+grasp_control: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 grasp_control
+.PHONY : grasp_control
+
+# fast build rule for target.
+grasp_control/fast:
+	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/build
+.PHONY : grasp_control/fast
+
+#=============================================================================
 # Target rules for targets named uninstall
 
 # Build rule for target.
@@ -194,6 +207,33 @@ haiku: cmake_check_build_system
 haiku/fast:
 	$(MAKE) -f CMakeFiles/haiku.dir/build.make CMakeFiles/haiku.dir/build
 .PHONY : haiku/fast
+
+src/grasp_control.o: src/grasp_control.cpp.o
+
+.PHONY : src/grasp_control.o
+
+# target to build an object file
+src/grasp_control.cpp.o:
+	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.o
+.PHONY : src/grasp_control.cpp.o
+
+src/grasp_control.i: src/grasp_control.cpp.i
+
+.PHONY : src/grasp_control.i
+
+# target to preprocess a source file
+src/grasp_control.cpp.i:
+	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.i
+.PHONY : src/grasp_control.cpp.i
+
+src/grasp_control.s: src/grasp_control.cpp.s
+
+.PHONY : src/grasp_control.s
+
+# target to generate assembly for a file
+src/grasp_control.cpp.s:
+	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.s
+.PHONY : src/grasp_control.cpp.s
 
 src/haiku.o: src/haiku.cpp.o
 
@@ -261,9 +301,13 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... grasp_control"
 	@echo "... uninstall"
 	@echo "... impedance_control"
 	@echo "... haiku"
+	@echo "... src/grasp_control.o"
+	@echo "... src/grasp_control.i"
+	@echo "... src/grasp_control.s"
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
