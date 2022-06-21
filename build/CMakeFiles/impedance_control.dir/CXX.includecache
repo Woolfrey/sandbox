@@ -6,12 +6,6 @@
 
 #IncludeRegexTransform: 
 
-../include/BiManualGrasp.h
-Humanoid.h
--
-Payload.h
--
-
 ../include/CartesianTrajectory.h
 iDynTree/Core/CubicSpline.h
 -
@@ -46,6 +40,8 @@ iDynTree/Core/CubicSpline.h
 yarp/os/PeriodicThread.h
 -
 
+../include/JointConfigurationsiCub3.h
+
 ../include/JointInterface.h
 iDynTree/Core/VectorDynSize.h
 -
@@ -62,10 +58,6 @@ yarp/dev/ControlBoardInterfaces.h
 yarp/dev/PolyDriver.h
 -
 yarp/os/Property.h
--
-
-../include/Payload.h
-iDynTree/Core/Transform.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/iDynTree/Core/ArticulatedBodyInertia.h
@@ -792,6 +784,12 @@ yarp/dev/Drivers.h
 yarp/conf/api.h
 -
 
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/AbstractContactable.h
+yarp/os/Port.h
+-
+yarp/os/UnbufferedContactable.h
+-
+
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Bottle.h
 yarp/os/Portable.h
 -
@@ -1076,6 +1074,10 @@ yarp/conf/numeric.h
 string
 -
 
+/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/RpcServer.h
+yarp/os/AbstractContactable.h
+-
+
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/os/Searchable.h
 yarp/os/api.h
 -
@@ -1163,7 +1165,11 @@ yarp/conf/system.h
 -
 
 /home/woolfrey/workspace/sandbox/src/impedance_control.cpp
-BiManualGrasp.h
+Humanoid.h
+-
+JointConfigurationsiCub3.h
+-
+yarp/os/RpcServer.h
 -
 
 /usr/include/eigen3/Eigen/Cholesky

@@ -20,22 +20,23 @@
 class JointInterface
 {
 	public:
-		JointInterface(const std::vector<std::string> &jointList,                           // Constructor
-		               const std::string &controlMode);
+		JointInterface(const std::string &controlMode,
+		               const std::vector<std::string> &jointList);                           // Constructor
 		
 		bool activate_control();
 		bool get_joint_state(iDynTree::VectorDynSize &q, iDynTree::VectorDynSize &qdot);    // Get the joint state as iDynTree objects
 		bool read_encoders();                                                               // Update the joint states internally
-		bool send_joint_commands(const iDynTree::VectorDynSize &tau,                        // Send control to the joint motors
-		                         const std::string &type);
+		bool send_joint_commands(const iDynTree::VectorDynSize &command);                   // Send control to the joint motors
 		void close();
-                                                                                                    
+        
+        protected:
+        	enum ControlMode {velocity, torque} controlMode;
+		int n;                                                                              // Number of joints being controlled	
+		std::vector<double> pMin, pMax, vMax;                                               // Position and velocity limits for each joint
+                                
 	private:
 		// Properties
 		bool isValid = false;                                                               // Won't do anything if false	
-		int n;                                                                              // Number of joints being controlled	
-		std::vector<double> pMin, pMax, vMax;                                               // Position and velocity limits for each joint	
-		std::string controlMode;                                                            // Velocity or torque	
 		std::vector<double> pos, vel;                                                       // Joint position and velocity limits
 		
 	   	// These interface with the hardware on the robot itself
@@ -52,11 +53,13 @@ class JointInterface
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                       Constructor                                              //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-JointInterface::JointInterface(const std::vector<std::string> &jointList,
-                               const std::string &_controlMode) :
-                               n(jointList.size()),
-                               controlMode(_controlMode)
+JointInterface::JointInterface(const std::string &_controlMode,
+                               const std::vector<std::string> &jointList) :
+                               n(jointList.size())
 {
+	     if(_controlMode == "velocity") this->controlMode = velocity;
+	else if(_controlMode == "torque")   this->controlMode = torque;
+	
 	// Resize std::vector objects
 	this->pos.resize(this->n);
 	this->vel.resize(this->n);
@@ -97,9 +100,9 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList,
 			  << "Could not open device driver." << std::endl;
 	}
 	else
-	{
-		if(controlMode == "torque" and not this->driver.view(this->torqueController)
-		or controlMode == "velocity" and not this->driver.view(this->velocityController))
+	{	
+		if(controlMode == torque   and not this->driver.view(this->torqueController)
+		or controlMode == velocity and not this->driver.view(this->velocityController))
 		{
 			std::cerr << "[ERROR] [JOINT INTERFACE] Constructor: "
 			          << "Unable to configure " << controlMode  << " control mode for the motors." << std::endl;
@@ -108,6 +111,11 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList,
 		{
 			std::cerr << "[ERROR] [JOINT INTERFACE] Constructor: "
 				  << "Unable to configure the control mode." << std::endl;
+		}
+		else if(not this->driver.view(this->limits))
+		{
+			std::cerr << "[ERROR] [JOINT INTERFACE] Constructor: "
+			          << "Unable to obtain the joint limits." << std::endl;
 		}
 		else
 		{
@@ -151,7 +159,6 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList,
 						break;
 					}
 				}
-				
 			}
 		}					
 	}
@@ -179,8 +186,8 @@ bool JointInterface::activate_control()
 	{
 		for(int i = 0; i < this->n; i++)
 		{
-			if(this->controlMode == "torque") this->mode->setControlMode(i, VOCAB_CM_TORQUE);
-			else                              this->mode->setControlMode(i, VOCAB_CM_VELOCITY);
+			if(this->controlMode == torque) this->mode->setControlMode(i, VOCAB_CM_TORQUE);
+			else                            this->mode->setControlMode(i, VOCAB_CM_VELOCITY);
 		}
 		
 		return true;
@@ -250,22 +257,12 @@ bool JointInterface::read_encoders()
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                    Send commands to the joints                                 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool JointInterface::send_joint_commands(const iDynTree::VectorDynSize &command,
-                                         const std::string &type)
+bool JointInterface::send_joint_commands(const iDynTree::VectorDynSize &command)
 {
 	if(not this->isValid)
 	{
 		std::cerr << "[ERROR] [JOINT INTERFACE] send_joint_commands(): "
 		          << "There was a problem during construction of this object. "
-		          << "Joint commands not sent." << std::endl;
-		
-		return false;
-	}
-	else if(type != this->controlMode)
-	{
-		std::cerr << "[ERROR] [JOINT INTERFACE] send_joint_commands(): "
-		          << "You specified a " << type << " command "
-		          << "but the controller is set to " << this->controlMode << " mode. "
 		          << "Joint commands not sent." << std::endl;
 		
 		return false;
@@ -285,8 +282,8 @@ bool JointInterface::send_joint_commands(const iDynTree::VectorDynSize &command,
 	
 		for(int i = 0; i < numJoints; i++)
 		{
-			if(this->controlMode == "velocity")    this->velocityController->velocityMove(i,command[i]);
-			else if(this->controlMode == "torque") this->torqueController->setRefTorque(i,command[i]);
+			     if(this->controlMode == velocity) this->velocityController->velocityMove(i,command[i]);
+			else if(this->controlMode == torque)   this->torqueController->setRefTorque(i,command[i]);
 		}
 		
 		return true;
