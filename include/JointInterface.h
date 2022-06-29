@@ -20,17 +20,15 @@
 class JointInterface
 {
 	public:
-		JointInterface(const std::string &controlMode,
-		               const std::vector<std::string> &jointList);                           // Constructor
+		JointInterface(const std::vector<std::string> &jointList);                           // Constructor
 		
 		bool activate_control();
 		bool get_joint_state(iDynTree::VectorDynSize &q, iDynTree::VectorDynSize &qdot);    // Get the joint state as iDynTree objects
 		bool read_encoders();                                                               // Update the joint states internally
-		bool send_joint_commands(const iDynTree::VectorDynSize &command);                   // Send control to the joint motors
+		bool send_torque_commands(const iDynTree::VectorDynSize &command);                  // Send control to the joint motors
 		void close();
         
         protected:
-        	enum ControlMode {velocity, torque} controlMode;
 		int n;                                                                              // Number of joints being controlled	
 		std::vector<double> pMin, pMax, vMax;                                               // Position and velocity limits for each joint
                                 
@@ -43,8 +41,7 @@ class JointInterface
 		yarp::dev::IControlLimits*   limits;                                                // Joint limits?
 		yarp::dev::IControlMode*     mode;                                                  // Sets the control mode of the motor
 		yarp::dev::IEncoders*        encoders;                                              // Joint position values (in degrees)
-		yarp::dev::ITorqueControl*   torqueController;
-		yarp::dev::IVelocityControl* velocityController;
+		yarp::dev::ITorqueControl*   controller;
 		yarp::dev::PolyDriver        driver;                                                // Device driver
 	
 };                                                                                                  // Semicolon needed after class declaration
@@ -53,13 +50,9 @@ class JointInterface
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                       Constructor                                              //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-JointInterface::JointInterface(const std::string &_controlMode,
-                               const std::vector<std::string> &jointList) :
+JointInterface::JointInterface(const std::vector<std::string> &jointList) :
                                n(jointList.size())
 {
-	     if(_controlMode == "velocity") this->controlMode = velocity;
-	else if(_controlMode == "torque")   this->controlMode = torque;
-	
 	// Resize std::vector objects
 	this->pos.resize(this->n);
 	this->vel.resize(this->n);
@@ -101,11 +94,10 @@ JointInterface::JointInterface(const std::string &_controlMode,
 	}
 	else
 	{	
-		if(controlMode == torque   and not this->driver.view(this->torqueController)
-		or controlMode == velocity and not this->driver.view(this->velocityController))
+		if(not this->driver.view(this->controller))
 		{
 			std::cerr << "[ERROR] [JOINT INTERFACE] Constructor: "
-			          << "Unable to configure " << controlMode  << " control mode for the motors." << std::endl;
+			          << "Unable to configure the controller for the joint motors." << std::endl;
 		}
 		else if(not this->driver.view(this->mode))
 		{
@@ -123,8 +115,8 @@ JointInterface::JointInterface(const std::string &_controlMode,
 			for(int i = 0; i < this->n; i++)
 			{
 				double notUsed;
-				this->limits->getLimits(i, &this->pMin[i], &this->pMax[i]);
-				this->limits->getVelLimits(i, &notUsed, &this->vMax[i]);            // Assume that vMin = 0
+				this->limits->getLimits(i, &this->pMin[i], &this->pMax[i]);         // Get the position limits
+				this->limits->getVelLimits(i, &notUsed, &this->vMax[i]);            // Get the velocity limits (assume vMin = -vMax)
 				
 				// Convert from degrees to radians
 				this->pMin[i] *= M_PI/180;
@@ -184,14 +176,10 @@ bool JointInterface::activate_control()
 	}
 	else
 	{
-		for(int i = 0; i < this->n; i++)
-		{
-			if(this->controlMode == torque) this->mode->setControlMode(i, VOCAB_CM_TORQUE);
-			else                            this->mode->setControlMode(i, VOCAB_CM_VELOCITY);
-		}
+		for(int i = 0; i < this->n; i++) this->mode->setControlMode(i, VOCAB_CM_TORQUE);
 		
 		return true;
-	}
+	}  
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,10 +230,6 @@ bool JointInterface::read_encoders()
 		
 		this->pos[i] *= M_PI/180;                                                           // Convert to rad
 		this->vel[i] *= M_PI/180;                                                           // Convert to rad/s
-		
-		// Sensor noise can give readings above or below limits so cap them
-		if(this->pos[i] > this->pMax[i]) this->pos[i] = this->pMax[i];
-		if(this->pos[i] < this->pMin[i]) this->pos[i] = this->pMin[i];
 	}
 
 	if(not success) std::cerr << "[ERROR] [JOINT INTERFACE] read_encoders(): "
@@ -257,7 +241,7 @@ bool JointInterface::read_encoders()
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                    Send commands to the joints                                 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool JointInterface::send_joint_commands(const iDynTree::VectorDynSize &command)
+bool JointInterface::send_torque_commands(const iDynTree::VectorDynSize &command)
 {
 	if(not this->isValid)
 	{
@@ -269,22 +253,19 @@ bool JointInterface::send_joint_commands(const iDynTree::VectorDynSize &command)
 	}
 	else
 	{
+		int numJoints = command.size();
+		
 		if(command.size() > this->n)
 		{
 			std::cerr << "[WARNING] [JOINT INTERFACE] send_joint_commands(): "
 			          << "Command vector had " << command.size() << " elements "
 			          << "but there are only " << this->n << " joints in this object! "
 			          << "Ignoring surplus commands..." << std::endl;
+			          
+			numJoints = this->n;
 		}
-		
-		int numJoints = command.size();
-		if(this->n < command.size()) numJoints = this->n;
 	
-		for(int i = 0; i < numJoints; i++)
-		{
-			     if(this->controlMode == velocity) this->velocityController->velocityMove(i,command[i]);
-			else if(this->controlMode == torque)   this->torqueController->setRefTorque(i,command[i]);
-		}
+		for(int i = 0; i < numJoints; i++) this->controller->setRefTorque(i,command[i]);
 		
 		return true;
 	}
