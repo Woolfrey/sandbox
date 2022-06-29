@@ -230,6 +230,10 @@ bool JointInterface::read_encoders()
 		
 		this->pos[i] *= M_PI/180;                                                           // Convert to rad
 		this->vel[i] *= M_PI/180;                                                           // Convert to rad/s
+		
+		// Ensure values are always within limits to avoid problems with avoidance functions
+		     if(this->pos[i] < this->pMin[i]) this->pos[i] = this->pMin[i];
+		else if(this->pos[i] > this->pMax[i]) this->pos[i] = this->pMax[i];
 	}
 
 	if(not success) std::cerr << "[ERROR] [JOINT INTERFACE] read_encoders(): "

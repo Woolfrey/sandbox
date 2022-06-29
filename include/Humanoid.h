@@ -176,10 +176,10 @@ Humanoid::Humanoid(const std::string &fileName) :
 		// Get the model and add some additional frames for the hands
 		iDynTree::Model temp = loader.model();
 		temp.addAdditionalFrameToLink("l_hand", "left",
-					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0),
+					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0.0),
 								  iDynTree::Position(0,0,-0.04)));
 		temp.addAdditionalFrameToLink("r_hand", "right",
-					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0),
+					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0.0),
 					      			  iDynTree::Position(0,0,-0.04)));
 									    
 		if(not this->computer.loadRobotModel(temp))
@@ -482,18 +482,6 @@ bool Humanoid::update_state()
 		                                this->qdot,
 		                                this->gravity))
 		{			
-			// Compute new acceleration limits
-			for(int i = 0; i < this->n; i++)
-			{
-				this->minAcc[i] = std::max(2*(this->pMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-				                  std::max((-this->vMax[i] - this->qdot[i])/this->dt,
-				                           -6.0));
-				                           
-				this->maxAcc[i] = std::min(2*(this->pMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-				                  std::min((this->vMax[i] - this->qdot[i])/this->dt,
-				                           6.0));                          
-			}
-			
 			return true;
 		}
 		else
@@ -609,41 +597,49 @@ void Humanoid::run()
 		
 		// Compute the null space torques
 		// NOTE: DAMPING TERM CAN CAUSE INSTABILITY IF TOO HIGH
-		Eigen::VectorXd tau_d(this->n);
-		for(int i = 0; i < this->n; i++) tau_d[i] = -1*this->qdot[i] - get_penalty(i);
+		Eigen::VectorXd qddot_d(this->n);
+		for(int i = 0; i < this->n; i++) qddot_d[i] = -2*this->qdot[i] - get_penalty(i);
 		
-		Eigen::VectorXd qddot_N = invM*tau_d;                                               // Null space accelerations (to be)
+		Eigen::VectorXd qddot = Eigen::VectorXd::Zero(this->n);
 		
-
-		// Compute the Cartesian control
-		Eigen::VectorXd xddot = Eigen::VectorXd::Zero(12);
-
-		if(this->leftControl) xddot.block(0,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("left"),
-		                                                                   this->computer.getFrameVel("left"),
-		                                                                   this->leftTrajectory,
-		                                                                   elapsedTime);
-		                                                                  
-		if(this->rightControl) xddot.block(6,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("right"),
-		                                                                    this->computer.getFrameVel("right"),
-		                                                                    this->rightTrajectory,
-		                                                                    elapsedTime);
-		                                                                    
-		Eigen::VectorXd qddot_R = invM*Jt*A*(xddot - accBias);                              // Range space accelerations
-
-		for(int i = 0; i < this->n; i++)
+		if(controlMode == cartesian)
 		{
-			if(limit_joint_acceleration(qddot_R[i], i))
-			{
-				std::cout << "[WARNING] [HUMANOID] "
-				          << jointList[i] << " joint hit a limit!" << std::endl;
-			}
+			// Compute the Cartesian control
+			Eigen::VectorXd xddot = Eigen::VectorXd::Zero(12);
+
+			if(this->leftControl) xddot.block(0,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("left"),
+				                                                           this->computer.getFrameVel("left"),
+				                                                           this->leftTrajectory,
+				                                                           elapsedTime);
+				                                                          
+			if(this->rightControl) xddot.block(6,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("right"),
+				                                                            this->computer.getFrameVel("right"),
+				                                                            this->rightTrajectory,
+				                                                            elapsedTime);
 			
-			double temp = qddot_R(i) + qddot_N(i);
-			limit_joint_acceleration(temp, i);
-			qddot_N(i) = temp - qddot_R(i);
+			// NOTE TO SELF:
+			// This is not quite correct. xddot = xddot_d - Jdot*qdot + inv(A)*(De + Ke) for it to be correct...
+			qddot = invM*Jt*A*xddot
+		              + (Eigen::MatrixXd::Identity(this->n,this->n) - invM*Jt*A*J)*qddot_d;
+			
+			for(int i = 0; i < this->n; i++)
+			{
+				if(limit_joint_acceleration(qddot(i),i))
+				{
+	//				std::cout << "[WARNING] [HUMANOID] "
+	//				          << jointList[i] << " joint hit a joint limit!" << std::endl;
+				}
+			}
+		}
+		else if(controlMode == grasp)
+		{
+			Eigen::VectorXd fc(6); fc << 00.0, 10.0, 00.0, 00.0, 00.0, 00.0;
+			
+			std::cout << "\nHere are the grasp forces:" << std::endl;
+			std::cout << C*fc << std::endl;
 		}
 		
-		Eigen::VectorXd torque = M*(qddot_R + (Eigen::MatrixXd::Identity(this->n, this->n) - invM*Jt*A*J)*qddot_N);
+		Eigen::VectorXd torque = M*qddot;
 		
 		for(int i = 0; i < this->n; i++) tau[i] = torque[i] + coriolisAndGravity[i];
 	}
@@ -657,7 +653,7 @@ void Humanoid::run()
 void Humanoid::threadRelease()
 {
 	this->computer.generalizedGravityForces(this->generalForces);                               // Get the torque needed to withstand gravity
-//	send_torque_commands(this->generalForces.jointTorques());                                   // Send to the robot
+	send_torque_commands(this->generalForces.jointTorques());                                   // Send to the robot
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -702,11 +698,7 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 		if(angle < M_PI) error(i+3) =  quat(i+1);                                           // Orientation error = quat vector component
 		else             error(i+3) = -quat(i+1);                                           // Angle > 180 degrees, so go other direction
 	}
-	
-//	std::cout << "\nHere is the pose error:" << std::endl;
-//	Eigen::VectorXd blah = iDynTree::toEigen(error);
-//	std::cout << (blah.block(0,0,3,1)).norm()*1000 << " " << angle*180/M_PI << std::endl;
-	
+
 	return error;
 }
 
@@ -715,7 +707,6 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::limit_joint_acceleration(double &qddot, const int &i)
 {
-
 	double min = std::max(2*(this->pMin[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt), // Position limit
 	             std::max((-this->vMax[i] - this->qdot[i])/this->dt,                                  // Velocity limit
 	                       -10.0));                                                                   // Acceleration limit

@@ -54,6 +54,21 @@ int main(int argc, char *argv[])
 						
 				output.addString("Down");
 			}
+			else if(command == "grasp")
+			{
+				iDynTree::Transform T1(iDynTree::Rotation::RPY(0,0,0),
+						       iDynTree::Position(0.35,0.15,0.70));
+						       
+				iDynTree::Transform T2(iDynTree::Rotation::RPY(0,0,0),
+						       iDynTree::Position(0.35,-0.15,0.70));
+				
+				iDynTree::Transform T3(iDynTree::Rotation::RPY(0,0,0),
+				                       iDynTree::Position(0.4, 0, 0.66));
+				
+				robot.grasp_object(T1, T2, T3);
+				
+				output.addString("Grasping");
+			}			
 			else if(command == "home")
 			{
 				robot.move_to_position(iDynTree::VectorDynSize(home), 2.0);

@@ -56,18 +56,6 @@ CMAKE_BINARY_DIR = /home/woolfrey/workspace/sandbox/build
 #=============================================================================
 # Targets provided globally by CMake.
 
-# Special rule for the target install/strip
-install/strip: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
-	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip
-
-# Special rule for the target install/strip
-install/strip/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
-	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip/fast
-
 # Special rule for the target install/local
 install/local: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
@@ -124,6 +112,18 @@ edit_cache/fast: edit_cache
 
 .PHONY : edit_cache/fast
 
+# Special rule for the target install/strip
+install/strip: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
+	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+.PHONY : install/strip
+
+# Special rule for the target install/strip
+install/strip/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
+	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+.PHONY : install/strip/fast
+
 # The main all target
 all: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/woolfrey/workspace/sandbox/build/CMakeFiles /home/woolfrey/workspace/sandbox/build/CMakeFiles/progress.marks
@@ -157,17 +157,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named grasp_control
+# Target rules for targets named math_test
 
 # Build rule for target.
-grasp_control: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 grasp_control
-.PHONY : grasp_control
+math_test: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 math_test
+.PHONY : math_test
 
 # fast build rule for target.
-grasp_control/fast:
-	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/build
-.PHONY : grasp_control/fast
+math_test/fast:
+	$(MAKE) -f CMakeFiles/math_test.dir/build.make CMakeFiles/math_test.dir/build
+.PHONY : math_test/fast
 
 #=============================================================================
 # Target rules for targets named uninstall
@@ -207,33 +207,6 @@ haiku: cmake_check_build_system
 haiku/fast:
 	$(MAKE) -f CMakeFiles/haiku.dir/build.make CMakeFiles/haiku.dir/build
 .PHONY : haiku/fast
-
-src/grasp_control.o: src/grasp_control.cpp.o
-
-.PHONY : src/grasp_control.o
-
-# target to build an object file
-src/grasp_control.cpp.o:
-	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.o
-.PHONY : src/grasp_control.cpp.o
-
-src/grasp_control.i: src/grasp_control.cpp.i
-
-.PHONY : src/grasp_control.i
-
-# target to preprocess a source file
-src/grasp_control.cpp.i:
-	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.i
-.PHONY : src/grasp_control.cpp.i
-
-src/grasp_control.s: src/grasp_control.cpp.s
-
-.PHONY : src/grasp_control.s
-
-# target to generate assembly for a file
-src/grasp_control.cpp.s:
-	$(MAKE) -f CMakeFiles/grasp_control.dir/build.make CMakeFiles/grasp_control.dir/src/grasp_control.cpp.s
-.PHONY : src/grasp_control.cpp.s
 
 src/haiku.o: src/haiku.cpp.o
 
@@ -289,31 +262,58 @@ src/impedance_control.cpp.s:
 	$(MAKE) -f CMakeFiles/impedance_control.dir/build.make CMakeFiles/impedance_control.dir/src/impedance_control.cpp.s
 .PHONY : src/impedance_control.cpp.s
 
+src/math_test.o: src/math_test.cpp.o
+
+.PHONY : src/math_test.o
+
+# target to build an object file
+src/math_test.cpp.o:
+	$(MAKE) -f CMakeFiles/math_test.dir/build.make CMakeFiles/math_test.dir/src/math_test.cpp.o
+.PHONY : src/math_test.cpp.o
+
+src/math_test.i: src/math_test.cpp.i
+
+.PHONY : src/math_test.i
+
+# target to preprocess a source file
+src/math_test.cpp.i:
+	$(MAKE) -f CMakeFiles/math_test.dir/build.make CMakeFiles/math_test.dir/src/math_test.cpp.i
+.PHONY : src/math_test.cpp.i
+
+src/math_test.s: src/math_test.cpp.s
+
+.PHONY : src/math_test.s
+
+# target to generate assembly for a file
+src/math_test.cpp.s:
+	$(MAKE) -f CMakeFiles/math_test.dir/build.make CMakeFiles/math_test.dir/src/math_test.cpp.s
+.PHONY : src/math_test.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
 	@echo "... all (the default if no target is provided)"
 	@echo "... clean"
 	@echo "... depend"
-	@echo "... install/strip"
 	@echo "... install/local"
 	@echo "... install"
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... grasp_control"
+	@echo "... install/strip"
+	@echo "... math_test"
 	@echo "... uninstall"
 	@echo "... impedance_control"
 	@echo "... haiku"
-	@echo "... src/grasp_control.o"
-	@echo "... src/grasp_control.i"
-	@echo "... src/grasp_control.s"
 	@echo "... src/haiku.o"
 	@echo "... src/haiku.i"
 	@echo "... src/haiku.s"
 	@echo "... src/impedance_control.o"
 	@echo "... src/impedance_control.i"
 	@echo "... src/impedance_control.s"
+	@echo "... src/math_test.o"
+	@echo "... src/math_test.i"
+	@echo "... src/math_test.s"
 .PHONY : help
 
 
