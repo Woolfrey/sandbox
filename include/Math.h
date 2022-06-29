@@ -146,42 +146,12 @@ Eigen::VectorXd solve_qp(const Eigen::VectorXd &y,                              
 	{
 		// Solve the alternate system z = B*x
 		
-		Eigen::MatrixXd B;
-		Eigen::VectorXd z;
-		
-		if(A.rows() == A.cols())
-		{
-			B = A;
-			z = y;
-		}
-		else
-		{
-			B = A.transpose()*A;
-			z = A.transpose()*y;
-		}
-/*		
 		Eigen::MatrixXd B = A.transpose()*A;
 		Eigen::VectorXd z = A.transpose()*y;
-*/
-	
+
 		Eigen::MatrixXd Q, R;
 		
-		if(get_qr_decomp(B,Q,R))
-		{
-		/*
-			std::cout << "\nz:" << std::endl;
-			std::cout << z << std::endl;
-			
-			std::cout << "\nQ'*z:" << std::endl;
-			std::cout << Q.transpose()*z << std::endl;
-			
-			std::cout << "\nR:" << std::endl;
-			std::cout << R << std::endl;
-			
-			std::cout << std::endl;
-		*/
-			return solve_back_substitution(Q.transpose()*z, R, xMin, xMax, x0);
-		}
+		if(get_qr_decomp(B,Q,R)) return solve_back_substitution(Q.transpose()*z, R, xMin, xMax, x0);
 		else
 		{
 			std::cerr << "[ERROR] solve_qp(): "
