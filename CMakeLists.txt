@@ -2,14 +2,10 @@ cmake_minimum_required(VERSION 2.8.9)					# Minimum cmake requirement
 
 project(sandbox)							# ${PROJECT_NAME}
 
-
 find_package(Eigen3 REQUIRED)
 #find_package(ICUB REQUIRED)						# Links below to ICUB::iKin
 find_package(iDynTree REQUIRED)						# Links below to iDynTree
 find_package(YARP 3.3.0 REQUIRED)					# Links below to ${YARP_LIBRARIES}
-
-find_package(RobotLibrary REQUIRED)
-
 
 ## I think this enables installation of gazebo modules in iCub direction
 find_package(ICUBcontrib REQUIRED)					# Mandatory

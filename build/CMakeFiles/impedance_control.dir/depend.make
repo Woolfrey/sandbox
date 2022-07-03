@@ -67,7 +67,6 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/wor
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlDebug.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlLimits.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode.h
-CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode2.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ICurrentControl.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IEncoders.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IEncodersTimed.h
@@ -78,13 +77,11 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/wor
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPWMControl.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPidControl.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl.h
-CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl2.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionDirect.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IRemoteCalibrator.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IRemoteVariables.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ITorqueControl.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl.h
-CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl2.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PidEnums.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PolyDriver.h
 CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o: /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/api.h

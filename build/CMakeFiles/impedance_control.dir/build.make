@@ -80,16 +80,16 @@ impedance_control_EXTERNAL_OBJECTS =
 bin/impedance_control: CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
 bin/impedance_control: CMakeFiles/impedance_control.dir/build.make
 bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-high-level.so
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_init.so.3.5.1
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_dev.so.3.5.1
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_math.so.3.5.1
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-modelio-urdf.so
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_init.so.3.7.2
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_dev.so.3.7.2
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_math.so.3.7.2
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-modelio.so
 bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-sensors.so
 bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-model.so
 bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-modelio-xml.so
 bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libidyntree-core.so
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_sig.so.3.5.1
-bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_os.so.3.5.1
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_sig.so.3.7.2
+bin/impedance_control: /home/woolfrey/workspace/robotology-superbuild/build/install/lib/libYARP_os.so.3.7.2
 bin/impedance_control: CMakeFiles/impedance_control.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/woolfrey/workspace/sandbox/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable bin/impedance_control"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/impedance_control.dir/link.txt --verbose=$(VERBOSE)

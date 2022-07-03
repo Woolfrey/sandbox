@@ -650,12 +650,6 @@ yarp/os/Vocab.h
 yarp/dev/api.h
 -
 
-/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode2.h
-yarp/conf/system.h
--
-yarp/dev/IControlMode.h
--
-
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ICurrentControl.h
 yarp/os/Vocab.h
 -
@@ -724,12 +718,6 @@ yarp/dev/api.h
 yarp/os/Vocab.h
 -
 
-/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl2.h
-yarp/conf/system.h
--
-yarp/dev/IPositionControl.h
--
-
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionDirect.h
 yarp/os/Vocab.h
 -
@@ -760,12 +748,6 @@ yarp/dev/api.h
 yarp/os/Vocab.h
 -
 yarp/dev/api.h
--
-
-/home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl2.h
-yarp/conf/system.h
--
-yarp/dev/IVelocityControl.h
 -
 
 /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PidEnums.h

@@ -68,7 +68,6 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlDebug.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlLimits.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode.h
- /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IControlMode2.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ICurrentControl.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IEncoders.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IEncodersTimed.h
@@ -79,13 +78,11 @@ CMakeFiles/impedance_control.dir/src/impedance_control.cpp.o
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPWMControl.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPidControl.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl.h
- /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionControl2.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IPositionDirect.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IRemoteCalibrator.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IRemoteVariables.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/ITorqueControl.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl.h
- /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/IVelocityControl2.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PidEnums.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/PolyDriver.h
  /home/woolfrey/workspace/robotology-superbuild/build/install/include/yarp/dev/api.h

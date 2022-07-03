@@ -278,7 +278,7 @@ ICUBCONTRIB_SHARED_LIBRARY:BOOL=OFF
 ICUBcontrib_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/ICUBcontrib
 
 //The directory containing a CMake configuration file for RobotLibrary.
-RobotLibrary_DIR:PATH=/usr/local
+RobotLibrary_DIR:PATH=RobotLibrary_DIR-NOTFOUND
 
 //The directory containing a CMake configuration file for YARP.
 YARP_DIR:PATH=/home/woolfrey/workspace/robotology-superbuild/build/install/lib/cmake/YARP
