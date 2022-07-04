@@ -107,6 +107,7 @@ bool CartesianTrajectory::get_state(iDynTree::Transform &pose,
 		std::cerr << "[ERROR] [CARTESIANTRAJECTORY] get_state(): "
 			  << "There was a problem during the construction of this object. "
 			  << "Could not get the desired state." << std::endl;
+			  
 		return false;
 	}
 	else
