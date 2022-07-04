@@ -221,66 +221,82 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left,
                             const iDynTree::Transform &right,
                             const iDynTree::Transform &object)
 {
-	// Move the hands to position
-	if(not move_to_pose(left, right, 2.0))
-	{
-		std::cout << "Why isn't this working?!" << std::endl;
-		return false;
-	}
-	else
-	{
-		while(yarp::os::Time::now() - this->startTime < 2.5);                               // Do nothing while we wait
-		
-		// Variables used in this scope
-		iDynTree::Transform T;                                                              // Temporary placeholder
-		iDynTree::Position p;                                                               // Temporary placeholder
-		Eigen::MatrixXd Gleft  = Eigen::MatrixXd::Identity(6,6);                            
-		Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
-		
-		// Grasping matrix for the left hand
-		T = this->computer.getWorldTransform("left");
-		p = object.getPosition() - T.getPosition();
-		
-		Gleft.block(3,0,3,3) <<   0 , -p(2),  p(1),
-		                        p(2),    0 , -p(0),
-		                       -p(1),  p(0),    0 ;
-		                       
-		// Grasping matrix for the right hand
-		T = this->computer.getWorldTransform("right");
-		p = object.getPosition() - T.getPosition();
-		
-		Gright.block(3,0,3,3) <<  0 , -p(2),  p(1),
-		                        p(2),    0 , -p(0),
-		                       -p(1),  p(0),    0 ;
-		                       
-		// Set new grasping matrices
-		this->G.block(0,0,6,6) = Gleft;
-		this->G.block(0,6,6,6) = Gright;
-		
-		this->C.block(0,0,6,6) = Gleft.inverse();
-		this->C.block(6,0,6,6) =-Gright.inverse();
+	iDynTree::Position p(0,0.05,0);                                                             // Offset the grasping pose for waypoints
 
-		// Set new object frame relative to left hand
-		// NOTE: iDynTree::KinDynComputations class will not let me set a new transform since
-		// the subsequent iDynTree::Model class is constant (ノಠ益ಠ)ノ彡┻━┻
-		this->T_hand_to_object = this->computer.getWorldTransform("left").inverse()*object;
-		
+	iDynTree::Transform L2 = left;
+	iDynTree::Transform L1(L2.getRotation(),
+	                       L2.getPosition() + p);
+	                       
+	std::vector<iDynTree::Transform> leftPoses;
+	leftPoses.push_back(L1);
+	leftPoses.push_back(L2);
+	
+	iDynTree::Transform R2 = right;
+	iDynTree::Transform R1(R2.getRotation(),
+	                       R2.getPosition() - p);
+	                       
+	std::vector<iDynTree::Transform> rightPoses;
+	rightPoses.push_back(R1);
+	rightPoses.push_back(R2);
+	
+	std::vector<double> times;
+	times.push_back(3.0);
+	times.push_back(3.5);
+	
+	if(move_to_poses(leftPoses, rightPoses, times)) return true;
+	else                                            return false;
+	
+	move_to_poses(leftPoses, rightPoses, times);
+	
+	while(yarp::os::Time::now() - this->startTime < 4.0);                                       // Do nothing while we wait
+	
+	// Variables used in this scope
+	iDynTree::Transform T;                                                                      // Temporary placeholder
+	Eigen::MatrixXd Gleft  = Eigen::MatrixXd::Identity(6,6);                            
+	Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
+	
+	// Grasping matrix for the left hand
+	T = this->computer.getWorldTransform("left");
+	p = object.getPosition() - T.getPosition();
+	
+	Gleft.block(3,0,3,3) <<   0 , -p(2),  p(1),
+	                        p(2),    0 , -p(0),
+	                       -p(1),  p(0),    0 ;
+	                       
+	// Grasping matrix for the right hand
+	T = this->computer.getWorldTransform("right");
+	p = object.getPosition() - T.getPosition();
+	
+	Gright.block(3,0,3,3) <<  0 , -p(2),  p(1),
+	                        p(2),    0 , -p(0),
+	                       -p(1),  p(0),    0 ;
+	                       
+	// Set new grasping matrices
+	this->G.block(0,0,6,6) = Gleft;
+	this->G.block(0,6,6,6) = Gright;
+	
+	this->C.block(0,0,6,6) = Gleft.inverse();
+	this->C.block(6,0,6,6) =-Gright.inverse();
 
-		// Set the object inertia
-		Ao <<  0.1, 0.0, 0.0, 0.0000, 0.0000, 0.0000,
-		       0.0, 0.1, 0.0, 0.0000, 0.0000, 0.0000,
-		       0.0, 0.0, 0.1, 0.0000, 0.0000, 0.0000,
-		       0.0, 0.0, 0.0, 0.0001, 0.0000, 0.0000,
-		       0.0, 0.0, 0.0, 0.0000, 0.0001, 0.0000,
-		       0.0, 0.0, 0.0, 0.0000, 0.0000, 0.0001;
-									    
-//		this->controlMode = grasp;
-		start();
+	// Set new object frame relative to left hand
+	// NOTE: iDynTree::KinDynComputations class will not let me set a new transform since
+	// the subsequent iDynTree::Model class is constant (ノಠ益ಠ)ノ彡┻━┻
+	this->T_hand_to_object = this->computer.getWorldTransform("left").inverse()*object;
+	
+
+	// Set the object inertia
+	Ao <<  0.1, 0.0, 0.0, 0.0000, 0.0000, 0.0000,
+	       0.0, 0.1, 0.0, 0.0000, 0.0000, 0.0000,
+	       0.0, 0.0, 0.1, 0.0000, 0.0000, 0.0000,
+	       0.0, 0.0, 0.0, 0.0001, 0.0000, 0.0000,
+	       0.0, 0.0, 0.0, 0.0000, 0.0001, 0.0000,
+	       0.0, 0.0, 0.0, 0.0000, 0.0000, 0.0001;
+								    
+	this->controlMode = grasp;
+	start();
 //		jump to threadInit();
-					
-		return true;
-	}
-
+				
+	return true;
 }
 
 
@@ -359,6 +375,38 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &left,
 	
 	start();
 //      jump to threadInit();
+	return true;
+}
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //                          Move both hands through multiple poses                               //
+///////////////////////////////////////////////////////////////////////////////////////////////////
+bool Humanoid::move_to_poses(const std::vector<iDynTree::Transform> &left,
+                             const std::vector<iDynTree::Transform> &right,
+                             const std::vector<double> &time)
+{
+	if(isRunning()) stop();
+	this->controlMode = cartesian;
+	this->leftControl = true; this->rightControl = true;
+	
+	// Set up the time trajectory
+	iDynTree::VectorDynSize times(time.size() + 1);
+	times[0] = 0.0;
+	for(int i = 1; i < times.size(); i++) times[i] = time[i-1];
+	
+	// Set up the left hand trajectory
+	std::vector<iDynTree::Transform> waypoint;                                                  // We will have 1 additional waypoint
+	waypoint.push_back(this->computer.getWorldTransform("left"));
+	waypoint.insert(waypoint.end(),left.begin(),left.end());                                    // Add other waypoints to the end
+	this->leftTrajectory = CartesianTrajectory(waypoint, times);
+	
+	// Set up the right hand trajectory
+	waypoint.clear();
+	waypoint.push_back(this->computer.getWorldTransform("right"));
+	waypoint.insert(waypoint.end(),right.begin(),right.end());
+	this->rightTrajectory = CartesianTrajectory(waypoint, times);
+	
+	start(); // Jump immediately to threadInit();
 	return true;
 }
 
