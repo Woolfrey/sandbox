@@ -30,7 +30,7 @@ class JointInterface
         
         protected:
 		int n;                                                                              // Number of joints being controlled	
-		std::vector<double> pMin, pMax, vMax;                                               // Position and velocity limits for each joint
+		std::vector<double> pMin, pMax, vMax, tMax;                                         // Position and velocity limits for each joint
                                 
 	private:
 		// Properties
@@ -59,6 +59,7 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList) :
 	this->pMin.resize(this->n);
 	this->pMax.resize(this->n);
 	this->vMax.resize(this->n);
+	this->tMax.resize(this->n);
 	
 	/************************** I copied this code from elsewhere *****************************/
 	
