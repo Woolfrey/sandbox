@@ -109,17 +109,17 @@ class Humanoid : public yarp::os::PeriodicThread,
 	
 		// Internal functions
 		
-		bool limit_joint_acceleration(double &qddot, const int &i);                         // Avoid joint limits
+		bool get_acceleration_limits(double &lower, double &upper, const int &jointNum);
 		
-		double get_penalty(const int &i);
+		double get_joint_penalty(const int &jointNum);
 		
 		iDynTree::Vector6 get_pose_error(const iDynTree::Transform &desired,                // Get the pose error between 2 transforms
 			                         const iDynTree::Transform &actual);
 			                         
 		Eigen::VectorXd get_cartesian_control(const iDynTree::Transform &actualPose,
-		                                      const iDynTree::Twist &actualVel,
-		                                      CartesianTrajectory &trajectory,
-		                                      const double &time);
+		                                      const iDynTree::Twist     &actualVel,
+		                                      CartesianTrajectory       &trajectory,
+		                                      const double              &time);
 		
 		// Control loop functions related to the PeriodicThread class
 		double startTime;
@@ -218,7 +218,7 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left,
                             const iDynTree::Transform &right,
                             const iDynTree::Transform &object)
 {
-	iDynTree::Position p(0,0.05,0);                                                             // Offset the grasping pose for waypoints
+/*	iDynTree::Position p(0,0.05,0);                                                             // Offset the grasping pose for waypoints
 
 	iDynTree::Transform L2 = left;
 	iDynTree::Transform L1(L2.getRotation(),
@@ -525,7 +525,7 @@ bool Humanoid::update_state()
 {
 	if(JointInterface::read_encoders())
 	{
-		get_joint_state(this->q, this->qdot);                                               // Get state as iDynTree objects from interface class
+		get_joint_state(this->q, this->qdot);                                               // Get state as iDynTree objects
 		
 		if(this->computer.setRobotState(this->torsoPose,
 		                                this->q,
@@ -659,10 +659,10 @@ void Humanoid::run()
 		A.block(m+2*this->n,          m,this->n,this->n) =  M;
 		A.block(m+2*this->n,m+2*this->n,this->n,this->n).setIdentity();
 		
-		Eigen::Matrix<double,m+3*this->n,1> y;
+		Eigen::VectorXd y = Eigen::VectorXd::Zero(m+3*this->n);
 		y.block(          0, 0,      m,1) = xddot - accBias;
 		y.block(          m, 0,this->n,1) = coriolisAndGravity;
-		y.block(m+1*this->n, 0,this->n,1).setZero();
+//		y.block(m+1*this->n, 0,this->n,1).setZero();
 //		y.block(m+2*this->n, 0,this->n,1) = redundant;  // NOTE: Set in the for-loop below
 		
 		// [ 0  0  -I  0 ][ lambda_1 ]     [ -qdot_max ]
@@ -687,11 +687,12 @@ void Humanoid::run()
 			z(i+1*this->n) = upper;
 			z(i+2*this->n) =-this->tMax[i];
 			z(i+3*this->n) = this->tMax[i];
-		
-			y.block(m+2*this->n+i,0,this->n,1) = -(get_joint_penalty() + 2*this->qdot(i)); // Assign redundant task
+			
+			y(m+2*this->n+i) = -(get_joint_penalty(i) + 2*this->qdot(i));               // Assign redundant task
+			
 		}
 		
-		Eigen::VectorXd x = solve(A.transpose()*A,A.transpose()*y,B,z,x0);
+//		Eigen::VectorXd x = solve(A.transpose()*A,A.transpose()*y,B,z,x0);
 		
 		
 		
@@ -818,23 +819,23 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //	                  Get the instantaneous joint acceleration limits                         //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool Humanoid::get_acceleration_limits(double &lower, double &upper, const int &i)
+bool Humanoid::get_acceleration_limits(double &lower, double &upper, const int &jointNum)
 {
-	if(i < 0 or i > this->n)
+	if(jointNum < 0 or jointNum > this->n)
 	{
 		std::cerr << "[ERROR] [HUMANOID] get_acceleration_limits(): "
-		          << "Input " << i << " is outside the joint range." << std::endl;
+		          << "Input " << jointNum << " is outside the joint range." << std::endl;
 		
 		return false;
 	}
 	else
 	{
-		lower = std::max(2*(this->pMin[i] - this->q[i] - this->dt)/(this->dt*this->dt),
-		        std::max(( -this->vMax[i] - this->qdot[i])/this->dt,
+		lower = std::max(2*(this->pMin[jointNum]-this->q[jointNum]-this->dt)/(this->dt*this->dt),
+		        std::max(( -this->vMax[jointNum]-this->qdot[jointNum])/this->dt,
 		                   -10.0));
 		
-		upper = std::min(2*(this->pMax[i] - this->q[i] - this->dt*this->qdot[i])/(this->dt*this->dt),
-	                std::min((  this->vMax[i] - this->qdot[i])/this->dt,
+		upper = std::min(2*(this->pMax[jointNum]-this->q[jointNum]-this->dt*this->qdot[jointNum])/(this->dt*this->dt),
+	                std::min((  this->vMax[jointNum]-this->qdot[jointNum])/this->dt,
 	                            10.0));
 	                            
 	        return true;
@@ -844,15 +845,15 @@ bool Humanoid::get_acceleration_limits(double &lower, double &upper, const int &
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //	                 Get the penalty function for joint limit avoidance                       //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-double Humanoid::get_joint_penalty(const int &i)
+double Humanoid::get_joint_penalty(const int &jointNum)
 {
-	double upper = this->pMax[i] - this->q(i);                                                  // Distance to upper limit
-	double lower = this->q(i) - this->pMin[i];                                                  // Distance from lower limit
-	double range = this->pMax[i] - this->pMin[i];                                               // Distance between limits
+	double upper = this->pMax[jointNum] - this->q(jointNum);                                    // Distance to upper limit
+	double lower = this->q(jointNum)    - this->pMin[jointNum];                                 // Distance from lower limit
+	double range = this->pMax[jointNum] - this->pMin[jointNum];                                 // Distance between limits
 	
 //      double penalty = range*range/(4*upper*lower);                                               // Penalty function, but only need derivative
 
-	double dpdq = (range*range*(2*this->q(i) - this->pMax[i] - this->pMin[i]))                  // Derivative (i.e. gradient)
+	double dpdq = (range*range*(2*this->q(jointNum)-this->pMax[jointNum]-this->pMin[jointNum])) // Derivative (i.e. gradient)
 	             /(4*upper*upper*lower*lower);
 
 	     if(dpdq >  1e03) dpdq =  1e03;
