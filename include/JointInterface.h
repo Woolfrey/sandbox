@@ -116,8 +116,8 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList) :
 			for(int i = 0; i < this->n; i++)
 			{
 				double notUsed;
-				this->limits->getLimits(i, &this->pMin[i], &this->pMax[i]);         // Get the position limits
-				this->limits->getVelLimits(i, &notUsed, &this->vMax[i]);            // Get the velocity limits (assume vMin = -vMax)
+				this->limits->getLimits(   i, &this->pMin[i], &this->pMax[i]);      // Get the position limits
+				this->limits->getVelLimits(i,       &notUsed, &this->vMax[i]);      // Get the velocity limits (assume vMin = -vMax)
 				
 				// Convert from degrees to radians
 				this->pMin[i] *= M_PI/180;
@@ -159,7 +159,7 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList) :
 	if(this->isValid) std::cout << "[INFO] [JOINT INTERFACE] Constructor: "
 			            << "Successfully configured the drivers." << std::endl;
 					  
-	else              this->driver.close();
+	else this->driver.close();
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////

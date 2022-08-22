@@ -37,7 +37,8 @@ std::vector<std::string> jointList = {"torso_pitch","torso_roll","torso_yaw",
 //				      "neck_fixed_joint"};
 
 class Humanoid : public yarp::os::PeriodicThread,
-                 public JointInterface
+                 public JointInterface,
+                 public QPSolver
 {
 	public:
 		Humanoid(const std::string &fileName);
@@ -683,8 +684,8 @@ void Humanoid::run()
 		{
 			double lower, upper;
 			get_acceleration_limits(lower,upper,i);
-			z(i)           = lower;
-			z(i+1*this->n) = upper;
+			z(i)           =-upper;
+			z(i+1*this->n) = lower;
 			z(i+2*this->n) =-this->tMax[i];
 			z(i+3*this->n) = this->tMax[i];
 			
