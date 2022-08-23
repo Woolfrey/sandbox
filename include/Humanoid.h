@@ -84,7 +84,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		enum ControlMode {joint, cartesian, grasp} controlMode;
 		
-		iDynTree::VectorDynSize q, qdot;                                                    // Joint positions and velocities
+		iDynTree::VectorDynSize q, qdot, qddot, tau;                                        // Joint positions, velocities, accelerations, torques
 		
 		// Joint control
 		double kq = 50.0;
@@ -95,6 +95,8 @@ class Humanoid : public yarp::os::PeriodicThread,
 		bool leftControl, rightControl;                                                     // Switch for activating left and right control
 		CartesianTrajectory leftTrajectory, rightTrajectory;                                // Cartesian trajectories for each hand
 		Eigen::Matrix<double,6,6> K, D;                                                     // Cartesian stiffness and damping
+		
+		Eigen::VectorXd initialGuess;                                                       // Used in the QP solver
 		
 		// Grasp Control
 		CartesianTrajectory objectTrajectory;                                               // As it says on the label
@@ -119,7 +121,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 			                         
 		Eigen::VectorXd get_cartesian_control(const iDynTree::Transform &actualPose,
 		                                      const iDynTree::Twist     &actualVel,
-		                                      CartesianTrajectory       &trajectory,
+		                                            CartesianTrajectory &trajectory,
 		                                      const double              &time);
 		
 		// Control loop functions related to the PeriodicThread class
@@ -197,6 +199,9 @@ Humanoid::Humanoid(const std::string &fileName) :
 			this->jointTrajectory.resize(this->n);                                      // Trajectory for joint motion control
 			this->q.resize(this->n);                                                    // Vector of joint positions
 			this->qdot.resize(this->n);                                                 // Vector of joint velocities
+			this->qddot.resize(this->n);                                                // Vector of joint accelerations
+			this->tau.resize(this->n);                                                  // Vector of joint torques
+			this->initialGuess.resize(12+3*this->n);                                    // Used by QP solver
 
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 
@@ -410,6 +415,9 @@ bool Humanoid::move_to_poses(const std::vector<iDynTree::Transform> &left,
 	waypoint.insert(waypoint.end(),right.begin(),right.end());
 	this->rightTrajectory = CartesianTrajectory(waypoint, times);
 	
+	// Set up the initial guess for the QP solver
+	this->initialGuess.setZero();
+	
 	start(); // Jump immediately to threadInit();
 	return true;
 }
@@ -473,6 +481,7 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 	
 	if(allGood)
 	{
+		
 		start();
 		return true;
 	}
@@ -526,7 +535,8 @@ bool Humanoid::update_state()
 {
 	if(JointInterface::read_encoders())
 	{
-		get_joint_state(this->q, this->qdot);                                               // Get state as iDynTree objects
+//		get_joint_state(this->q, this->qdot);                                               // Get state as iDynTree objects
+		get_joint_state(this->q, this->qdot, this->qddot, this->tau);
 		
 		if(this->computer.setRobotState(this->torsoPose,
 		                                this->q,
@@ -581,11 +591,11 @@ void Humanoid::run()
 	
 	double elapsedTime = yarp::os::Time::now() - this->startTime;                               // Elapsed time since start of control loop
 	
-	iDynTree::VectorDynSize tau(this->n);                                                       // We want to compute this
+	iDynTree::VectorDynSize controlInput(this->n);                                              // To be computed
 	
 	if(this->controlMode == joint)
 	{
-		iDynTree::VectorDynSize ctrl(this->n),
+		iDynTree::VectorDynSize refAcc(this->n),
 			                qddot_d(this->n),
 			                qdot_d(this->n),
 			                q_d(this->n);
@@ -597,18 +607,18 @@ void Humanoid::run()
 				                                        qdot_d[i],
 				                                        qddot_d[i]);
 			
-			ctrl[i] = qddot_d[i]                                                        // Feedforward term
-			        + this->kd*(qdot_d[i] - this->qdot[i])                              // Velocity feedback
-			        + this->kq*(q_d[i] - this->q[i]);                                   // Position feedback
+			refAcc[i] = qddot_d[i]                                                      // Feedforward term
+			          + this->kd*(qdot_d[i] - this->qdot[i])                            // Velocity feedback
+			          + this->kq*(q_d[i] - this->q[i]);                                 // Position feedback
 			        
 		}
 			
 		// Compute the inverse dynamics from the joint acceleration
 		iDynTree::Vector6 baseAcc; baseAcc.zero();                                          // Zero base acceleration
 		iDynTree::LinkNetExternalWrenches wrench(this->computer.model()); wrench.zero();    // No external wrenches
-		this->computer.inverseDynamics(baseAcc, ctrl, wrench, this->generalForces);         // Solve the inverse dynamics
+		this->computer.inverseDynamics(baseAcc, refAcc, wrench, this->generalForces);       // Solve the inverse dynamics
 		
-		tau = this->generalForces.jointTorques();                                           // Extract the joint torque vector
+		controlInput = this->generalForces.jointTorques();                                  // Extract the joint torque vector
 	}
 	else
 	{
@@ -686,16 +696,18 @@ void Humanoid::run()
 			get_acceleration_limits(lower,upper,i);
 			z(i)           =-upper;
 			z(i+1*this->n) = lower;
-			z(i+2*this->n) =-this->tMax[i];
-			z(i+3*this->n) = this->tMax[i];
+			z(i+2*this->n) =-this->tMax[i];                    
+			z(i+3*this->n) =-this->tMax[i];                                             // Minimum is just negative of maximum
 			
 			y(m+2*this->n+i) = -(get_joint_penalty(i) + 2*this->qdot(i));               // Assign redundant task
 			
+			initialGuess(m+1*this->n+i) = this->qddot(i);                               // Assign measured joint accel to initial guess
+			initialGuess(m+2*this->n+i) = this->tau(i);                                 // Assign measured torque to initial guess
 		}
+				
+		initialGuess = solve(A.transpose()*A, A.transpose()*y, B, z, initialGuess);         // Solve the QP problem
 		
-//		Eigen::VectorXd x = solve(A.transpose()*A,A.transpose()*y,B,z,x0);
-		
-		
+		for(int i = 0; i < this->n; i++) controlInput(i) = initialGuess(m+2*this->n+i);     // Transfer torque values
 		
 		/*
 		Eigen::MatrixXd invM = get_inverse(M);                                              // Invert the inertia matrix
@@ -755,7 +767,7 @@ void Humanoid::run()
 		*/
 	}
 	
-	send_torque_commands(tau);                                                                  // Send the commands to the joint motors
+	send_torque_commands(controlInput);                                                         // Send the commands to the joint motors
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
