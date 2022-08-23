@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	Eigen::Vector3d rleft;  rleft  << 0.00,
 	                                  0.05,
 	                                  0.01;
-	Eigen::Vector3d rright; rright << 0.00,
+	Eigen::Vector3d rright; rright << 0.01,
 	                                 -0.05,
 	                                  0.01;
 	
