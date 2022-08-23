@@ -20,12 +20,22 @@
 class JointInterface
 {
 	public:
-		JointInterface(const std::vector<std::string> &jointList);                           // Constructor
+		JointInterface(const std::vector<std::string> &jointList);                          // Constructor
 		
-		bool activate_control();
-		bool get_joint_state(iDynTree::VectorDynSize &q, iDynTree::VectorDynSize &qdot);    // Get the joint state as iDynTree objects
+		bool activate_control();                                                            // Activates control if construction successful
+		
+		bool get_joint_state(iDynTree::VectorDynSize &q,                                    // Get the joint state as iDynTree objects
+		                     iDynTree::VectorDynSize &qdot);
+		                     
+		bool get_joint_state(iDynTree::VectorDynSize &q,
+		                     iDynTree::VectorDynSize &qdot,
+		                     iDynTree::VectorDynSize &qddot,
+		                     iDynTree::VectorDynSize &tau);
+		
 		bool read_encoders();                                                               // Update the joint states internally
+		
 		bool send_torque_commands(const iDynTree::VectorDynSize &command);                  // Send control to the joint motors
+		
 		void close();
         
         protected:
@@ -35,7 +45,7 @@ class JointInterface
 	private:
 		// Properties
 		bool isValid = false;                                                               // Won't do anything if false	
-		std::vector<double> pos, vel;                                                       // Joint position and velocity limits
+		std::vector<double> pos, vel, acc, torque;                                          // Joint position, velocity, acceleration, torque
 		
 	   	// These interface with the hardware on the robot itself
 		yarp::dev::IControlLimits*   limits;                                                // Joint limits?
@@ -56,6 +66,8 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList) :
 	// Resize std::vector objects
 	this->pos.resize(this->n);
 	this->vel.resize(this->n);
+	this->acc.resize(this->n);
+	this->torque.resize(this->n);
 	this->pMin.resize(this->n);
 	this->pMax.resize(this->n);
 	this->vMax.resize(this->n);
@@ -116,8 +128,9 @@ JointInterface::JointInterface(const std::vector<std::string> &jointList) :
 			for(int i = 0; i < this->n; i++)
 			{
 				double notUsed;
-				this->limits->getLimits(   i, &this->pMin[i], &this->pMax[i]);      // Get the position limits
-				this->limits->getVelLimits(i,       &notUsed, &this->vMax[i]);      // Get the velocity limits (assume vMin = -vMax)
+				this->limits->getLimits(i, &this->pMin[i], &this->pMax[i]);         // Get the position limits
+				this->limits->getVelLimits(i, &notUsed, &this->vMax[i]);            // Get the velocity limits (assume vMin = -vMax)
+				this->controller->getTorqueRange(i, &notUsed, &this->tMax[i]);      // Get the torque limits (assume tMin = -tMax)
 				
 				// Convert from degrees to radians
 				this->pMin[i] *= M_PI/180;
@@ -219,6 +232,50 @@ bool JointInterface::get_joint_state(iDynTree::VectorDynSize &q, iDynTree::Vecto
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                   Get the joint state as iDynTree::VectorDynSize objects                       //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool JointInterface::get_joint_state(iDynTree::VectorDynSize &q,
+                                     iDynTree::VectorDynSize &qdot,
+                                     iDynTree::VectorDynSize &qddot,
+                                     iDynTree::VectorDynSize &tau)
+{
+	if(not this->isValid)
+	{
+		std::cerr << "[ERROR] [JOINT INTERFACE] get_joint_state(): "
+		          << "Something went wrong during the construction of this object. "
+		          << "Could not obtain the joint state." << std::endl;
+		
+		return false;
+	}
+	else if(q.size()     != this->n
+	     or qdot.size()  != this->n
+	     or qddot.size() != this->n
+	     or tau.size()   != this->n)
+	{
+		std::cerr << "[ERROR] [JOINT INTERFACE] get_joint_state(): "
+		          << "There are " << this->n << " joints in this model but "
+		          << "the position vector had " << q.size() << " elements, "
+		          << "the velocity vector had " << qdot.size() << " elements, "
+		          << "the acceleration vector had " << qddot.size() << " elements, and "
+		          << "the torque vector had " << tau.size() << " elements." << std::endl;
+		
+		return false;
+	}
+	else
+	{
+		for(int i = 0; i < this->n; i++)
+		{
+			q[i]     = this->pos[i];
+			qdot[i]  = this->vel[i];
+			qddot[i] = this->acc[i];
+			tau[i]   = this->torque[i];
+		}
+		
+		return true;
+	}
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                         Get new joint state information from the encoders                      //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool JointInterface::read_encoders()
@@ -228,9 +285,12 @@ bool JointInterface::read_encoders()
 	{
 		success &= this->encoders->getEncoder(i, &this->pos[i]);                            // Read the position
 		success &= this->encoders->getEncoderSpeed(i, &this->vel[i]);                       // Read the velocity
+		success &= this->encoders->getEncoderAcceleration(i, &this->acc[i]);                // Read the acceleration
+		success &= this->controller->getTorque(i, &this->torque[i]);                        // Read the joint torque
 		
 		this->pos[i] *= M_PI/180;                                                           // Convert to rad
 		this->vel[i] *= M_PI/180;                                                           // Convert to rad/s
+		this->acc[i] *= M_PI/180;                                                           // Convert to rad/s/s
 		
 		// Ensure values are always within limits to avoid problems with avoidance functions
 		     if(this->pos[i] < this->pMin[i]) this->pos[i] = this->pMin[i];
