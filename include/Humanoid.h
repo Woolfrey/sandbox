@@ -84,7 +84,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		enum ControlMode {joint, cartesian, grasp} controlMode;
 		
-		iDynTree::VectorDynSize q, qdot, qddot, tau;                                        // Joint positions, velocities, accelerations, torques
+		iDynTree::VectorDynSize q, qdot, qddot, tau;                                        // Joint state
 		
 		// Joint control
 		double kq = 50.0;
@@ -97,11 +97,6 @@ class Humanoid : public yarp::os::PeriodicThread,
 		Eigen::Matrix<double,6,6> K, D;                                                     // Cartesian stiffness and damping
 		
 		Eigen::VectorXd initialGuess;                                                       // Used in the QP solver
-		
-		// Grasp Control
-		CartesianTrajectory objectTrajectory;                                               // As it says on the label
-		Eigen::Matrix<double,6,12> G;                                                       // Grasp matrix
-		Eigen::Matrix<double,12,6> C;                                                       // Constraint matrix
 		
 		// Kinematics & dynamics
 		iDynTree::FreeFloatingGeneralizedTorques generalForces;                             // Forces and torques		
@@ -118,11 +113,12 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		iDynTree::Vector6 get_pose_error(const iDynTree::Transform &desired,                // Get the pose error between 2 transforms
 			                         const iDynTree::Transform &actual);
-			                         
-		Eigen::VectorXd get_cartesian_control(const iDynTree::Transform &actualPose,
-		                                      const iDynTree::Twist     &actualVel,
-		                                            CartesianTrajectory &trajectory,
-		                                      const double              &time);
+			                       
+		Eigen::VectorXd get_feedforward_feedback(Eigen::VectorXd           &feedback,
+			                                 CartesianTrajectory       &trajectory,
+		                                         const iDynTree::Transform &actualPose,
+		                                         const iDynTree::Twist     &actualVel,
+		                                         const double              &time);
 		
 		// Control loop functions related to the PeriodicThread class
 		double startTime;
@@ -313,8 +309,8 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left,
  //                             Move a single hand to a desired pose                              //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_pose(const iDynTree::Transform &desired,
-                            const std::string &whichHand,
-                            const double &time)
+                            const std::string         &whichHand,
+                            const double              &time)
 {	
 	if(not(whichHand == "left") and not(whichHand == "right"))
 	{
@@ -361,7 +357,7 @@ bool Humanoid::move_to_pose(const iDynTree::Transform &desired,
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::move_to_pose(const iDynTree::Transform &left,
 			    const iDynTree::Transform &right,
-			    const double &time)
+			    const double              &time)
 {
 	if(isRunning()) stop();                                                                     // Stop any control threads that are running
 	this->controlMode = cartesian;                                                             // Switch to Cartesian control mode
@@ -492,8 +488,8 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
  //                          Translate a hand by the specified amount                             //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::translate(const iDynTree::Position &distance,
-                         const std::string &whichHand,
-                         const double &time)
+                         const std::string        &whichHand,
+                         const double             &time)
 {
 	if(whichHand != "left" and whichHand != "right")
 	{
@@ -517,7 +513,7 @@ bool Humanoid::translate(const iDynTree::Position &distance,
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool Humanoid::translate(const iDynTree::Position &leftDistance,
                          const iDynTree::Position &rightDistance,
-                         const double &time)
+                         const double             &time)
 {
 	iDynTree::Transform leftTF = this->computer.getWorldTransform("left");
 	iDynTree::Transform T1(leftTF.getRotation(), leftTF.getPosition() + leftDistance);
@@ -650,121 +646,37 @@ void Humanoid::run()
 		Eigen::VectorXd coriolisAndGravity = iDynTree::toEigen(this->generalForces.jointTorques());
 		
 		// Compute the Cartesian acceleration
-		Eigen::VectorXd xddot = Eigen::VectorXd::Zero(12);
-			
-		// Solve with QP:
-		//     [ 0   0  J  0 ][ lambda_1 ]     [ xddot - Jdot*qdot ]                        // Kinematic constraint
-		//     [ 0   0 -M  I ][ lambda_2 ]  =  [    C*qdot + g     ]                        // Dynamic equations of motion
-		//     [ J' -M  0  0 ][  qddot   ]     [         0         ]                        // Link between kinematics & dynamics
-		//     [ 0   M  0  I ]    tau    ]     [     redundant     ]                        // Redundancy
-		//
-		//           A             x        =            y
-		
-		int m = 12;
-		Eigen::MatrixXd A = Eigen::MatrixXd::Zero(m+3*this->n,m+3*this->n);
-		A.block(0          ,m+1*this->n,      m,this->n) =  J;
-		A.block(m          ,m+1*this->n,this->n,this->n) = -M;
-		A.block(m          ,m+2*this->n,this->n,this->n).setIdentity();
-		A.block(m+1*this->n,          0,this->n,      m) = J.transpose();
-		A.block(m+1*this->n,          m,this->n,this->n) = -M;
-		A.block(m+2*this->n,          m,this->n,this->n) =  M;
-		A.block(m+2*this->n,m+2*this->n,this->n,this->n).setIdentity();
-		
-		Eigen::VectorXd y = Eigen::VectorXd::Zero(m+3*this->n);
-		y.block(          0, 0,      m,1) = xddot - accBias;
-		y.block(          m, 0,this->n,1) = coriolisAndGravity;
-//		y.block(m+1*this->n, 0,this->n,1).setZero();
-//		y.block(m+2*this->n, 0,this->n,1) = redundant;  // NOTE: Set in the for-loop below
-		
-		// [ 0  0  -I  0 ][ lambda_1 ]     [ -qdot_max ]
-		// [ 0  0   I  0 ][ lamdda_2 ]  >= [  qdot_min ]
-		// [ 0  0   0 -I ][  qddot   ]     [ -tau_max  ]
-		// [ 0  0   0  I ][   tau    ]     [  tau_min  ]
-		//
-		//       B             x        >=        z
-		
-		Eigen::MatrixXd B = Eigen::MatrixXd::Zero(4*this->n,m+3*this->n);
-		B.block(        0,m+1*this->n,this->n,this->n) = -Eigen::MatrixXd::Identity(this->n,this->n);
-		B.block(1*this->n,m+1*this->n,this->n,this->n).setIdentity();
-		B.block(2*this->n,m+2*this->n,this->n,this->n) = -Eigen::MatrixXd::Identity(this->n,this->n);
-		B.block(3*this->n,m+2*this->n,this->n,this->n).setIdentity();
-		
-		Eigen::VectorXd z(4*this->n);
-		for(int i = 0; i < this->n; i++)
+		Eigen::VectorXd    xddot = Eigen::VectorXd::Zero(12);
+		Eigen::VectorXd feedback = Eigen::VectorXd::Zero(12);
+		Eigen::VectorXd blah(6);
+		if(this->leftControl)
 		{
-			double lower, upper;
-			get_acceleration_limits(lower,upper,i);
-			z(i)           =-upper;
-			z(i+1*this->n) = lower;
-			z(i+2*this->n) =-this->tMax[i];                    
-			z(i+3*this->n) =-this->tMax[i];                                             // Minimum is just negative of maximum
-			
-			y(m+2*this->n+i) = -(get_joint_penalty(i) + 2*this->qdot(i));               // Assign redundant task
-			
-			initialGuess(m+1*this->n+i) = this->qddot(i);                               // Assign measured joint accel to initial guess
-			initialGuess(m+2*this->n+i) = this->tau(i);                                 // Assign measured torque to initial guess
+			xddot.head(6) = get_feedforward_feedback(blah,
+					                         this->leftTrajectory,
+		                                                 this->computer.getWorldTransform("left"),
+		                                                 this->computer.getFrameVel("left"),
+		                                                 elapsedTime);
+		        feedback.head(6) = blah;
+		}                
+		else feedback.head(6) = -this->D*iDynTree::toEigen(this->computer.getFrameVel("left")); // Apply a damping force
+		
+		if(this->rightControl)
+		{
+			xddot.tail(6) = get_feedforward_feedback(blah,
+			                                         this->rightTrajectory,
+			                                         this->computer.getWorldTransform("right"),
+			                                         this->computer.getFrameVel("right"),
+			                                         elapsedTime);
+			feedback.tail(6) = blah;
 		}
-				
-		initialGuess = solve(A.transpose()*A, A.transpose()*y, B, z, initialGuess);         // Solve the QP problem
+		else feedback.tail(6) = -this->D*iDynTree::toEigen(this->computer.getFrameVel("right")); // Apply a damping force
 		
-		for(int i = 0; i < this->n; i++) controlInput(i) = initialGuess(m+2*this->n+i);     // Transfer torque values
 		
-		/*
-		Eigen::MatrixXd invM = get_inverse(M);                                              // Invert the inertia matrix
-		Eigen::MatrixXd A = get_inverse(J*invM*Jt);                                         // Cartesian inertia matrix
-		
-		// Compute the bias accelerations & forces
-		Eigen::VectorXd accBias(12);                                                        // (dJ/dt)*(dq/dt)
-		accBias.block(0,0,6,1) = iDynTree::toEigen(this->computer.getFrameBiasAcc("left"));
-		accBias.block(6,0,6,1) = iDynTree::toEigen(this->computer.getFrameBiasAcc("right"));
-		
-		this->computer.generalizedBiasForces(this->generalForces);			
-		Eigen::VectorXd coriolisAndGravity = iDynTree::toEigen(this->generalForces.jointTorques());
-		
-		// Compute the null space torques
-		// NOTE: DAMPING TERM CAN CAUSE INSTABILITY IF TOO HIGH
-		Eigen::VectorXd qddot_d(this->n);
-		for(int i = 0; i < this->n; i++) qddot_d[i] = -2*this->qdot[i] - get_penalty(i);
-		
-		Eigen::VectorXd qddot = Eigen::VectorXd::Zero(this->n);
-		Eigen::VectorXd torque = Eigen::VectorXd::Zero(this->n);
-		
-		if(this->controlMode == cartesian)
-		{
-			// Compute the Cartesian control
-			Eigen::VectorXd xddot = Eigen::VectorXd::Zero(12);
+		xddot = xddot + J*M.inverse()*J.transpose()*feedback;                               // Resolve the dynamic coupling
 
-			if(this->leftControl) xddot.block(0,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("left"),
-				                                                           this->computer.getFrameVel("left"),
-				                                                           this->leftTrajectory,
-				                                                           elapsedTime);
-				                                                          
-			if(this->rightControl) xddot.block(6,0,6,1) = get_cartesian_control(this->computer.getWorldTransform("right"),
-				                                                            this->computer.getFrameVel("right"),
-				                                                            this->rightTrajectory,
-				                                                            elapsedTime);
 			
-			// NOTE TO SELF:
-			// This is not quite correct. xddot = xddot_d - Jdot*qdot + inv(A)*(De + Ke) for it to be correct...
-			qddot = invM*Jt*A*xddot
-		              + (Eigen::MatrixXd::Identity(this->n,this->n) - invM*Jt*A*J)*qddot_d;
-			
-			for(int i = 0; i < this->n; i++) limit_joint_acceleration(qddot(i),i);
-			
-			torque = M*qddot;
-		}
-		else if(this->controlMode == grasp)
-		{
-			// Set up the constraints
-			Eigen::MatrixXd Jc  = this->C.transpose()*J;
-			Eigen::MatrixXd Jct = Jc.transpose();
-			Eigen::MatrixXd Ac  = get_inverse(Jc*invM*Jct);
-			Eigen::MatrixXd Nct = Eigen::MatrixXd::Identity(this->n,this->n) - Jct*Ac*Jc*invM;
-				
-		}
 		
-		for(int i = 0; i < this->n; i++) tau[i] = torque[i] + coriolisAndGravity[i];
-		*/
+		
 	}
 	
 	send_torque_commands(controlInput);                                                         // Send the commands to the joint motors
@@ -780,25 +692,26 @@ void Humanoid::threadRelease()
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                        Solve the Cartesian motion to track a trajectory                        //
+ //                 Get the desired accelerations and Cartesian *forces*                           //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-Eigen::VectorXd Humanoid::get_cartesian_control(const iDynTree::Transform &actualPose,
-                                                const iDynTree::Twist &actualVel,
-                                                      CartesianTrajectory &trajectory,
-                                                const double &time)
+Eigen::VectorXd Humanoid::get_feedforward_feedback(Eigen::VectorXd          &feedback,
+                                                  CartesianTrajectory       &trajectory,
+                                                  const iDynTree::Transform &actualPose,
+                                                  const iDynTree::Twist     &actualVel,
+                                                  const double              &time)
 {
 	// Solve for the desired state
 	iDynTree::Transform  desiredPose;
-	iDynTree::Twist      vel;
-	iDynTree::SpatialAcc acc;
+	iDynTree::Twist      desiredVel;
+	iDynTree::SpatialAcc desiredAcc;
 	
-	trajectory.get_state(desiredPose, vel, acc, time);
+	trajectory.get_state(desiredPose, desiredVel, desiredAcc, time);                            // Get the desired state from trajectory object
 	
-	// Compute the state error
-	Eigen::VectorXd e = iDynTree::toEigen(get_pose_error(desiredPose, actualPose));
-	Eigen::VectorXd edot = iDynTree::toEigen(vel - actualVel);
+	// NOTE: This feedback term is FORCE, not acceleration
+	feedback = this->D*iDynTree::toEigen(desiredVel - actualVel)                                // Velocity feedback
+	         + this->K*iDynTree::toEigen(get_pose_error(desiredPose, actualPose));              // Position, orientation feedback
 	
-	return iDynTree::toEigen(acc) + this->D*edot + this->K*e;
+	return iDynTree::toEigen(desiredAcc);                                                       // Return the feedforward term
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -823,8 +736,6 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 	}
 	
 	double norm = sqrt(error[0]*error[0] + error[1]*error[1] + error[2]*error[2]);
-	
-	std::cout << "\nThe pose error is " << norm*1000 << " mm and " << angle*180/M_PI << " degrees." << std::endl;
 
 	return error;
 }
@@ -843,13 +754,21 @@ bool Humanoid::get_acceleration_limits(double &lower, double &upper, const int &
 	}
 	else
 	{
-		lower = std::max(2*(this->pMin[jointNum]-this->q[jointNum]-this->dt)/(this->dt*this->dt),
-		        std::max(( -this->vMax[jointNum]-this->qdot[jointNum])/this->dt,
-		                   -10.0));
-		
-		upper = std::min(2*(this->pMax[jointNum]-this->q[jointNum]-this->dt*this->qdot[jointNum])/(this->dt*this->dt),
-	                std::min((  this->vMax[jointNum]-this->qdot[jointNum])/this->dt,
-	                            10.0));
+		lower = std::max( 2*(this->pMin[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
+			std::max(  (-this->vMax[jointNum] - this->qdot[jointNum])/this->dt,
+			            -20.0));
+			            
+		upper = std::min( 2*(this->pMax[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
+		        std::min(  (this->vMax[jointNum] - this->qdot[jointNum])/this->dt,
+		                    20.0));
+		                    
+		                    
+		if(upper < lower)
+		{
+			double temp = lower;
+			lower = upper;
+			upper = temp;
+		}
 	                            
 	        return true;
 	}
