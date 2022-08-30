@@ -8,6 +8,9 @@
 #include <JointConfigurationsiCub3.h>                                                            // Pre-programmed configurations for iCub3
 #include <yarp/os/RpcServer.h>                                                                     // Ports for communicating with YARP
 
+double shortTime = 2.0;
+double longTime  = 5.0;
+
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                                MAIN                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,35 +53,25 @@ int main(int argc, char *argv[])
 			{
 				robot.translate(iDynTree::Position(0.0, 0.0,-0.1),
 						iDynTree::Position(0.0, 0.0,-0.1),
-						2.0);
+						longTime);
 						
 				output.addString("Down");
 			}
 			else if(command == "grasp")
 			{
-				iDynTree::Transform T1(iDynTree::Rotation::RPY(0,0,0),
-						       iDynTree::Position(0.35,0.15,0.70));
-						       
-				iDynTree::Transform T2(iDynTree::Rotation::RPY(0,0,0),
-						       iDynTree::Position(0.35,-0.15,0.70));
-				
-				iDynTree::Transform T3(iDynTree::Rotation::RPY(0,0,0),
-				                       iDynTree::Position(0.4, 0, 0.66));
-				
-				robot.grasp_object(T1, T2, T3);
 				
 				output.addString("Grasping");
 			}			
 			else if(command == "home")
 			{
-				robot.move_to_position(iDynTree::VectorDynSize(home), 2.0);
+				robot.move_to_position(iDynTree::VectorDynSize(home), shortTime);
 				output.addString("Casa");
 			}
 			else if(command == "in")
 			{
 				robot.translate(iDynTree::Position(0.0,-0.1,0.0),
 						iDynTree::Position(0.0, 0.1,0.0),
-						2.0);
+						longTime);
 						
 				output.addString("In");
 			}
@@ -86,7 +79,7 @@ int main(int argc, char *argv[])
 			{
 				robot.translate(iDynTree::Position(0.0,0.1,0.0),
 						iDynTree::Position(0.0,0.1,0.0),
-						2.0);
+						longTime);
 						
 				output.addString("Sinistra");
 			}
@@ -94,7 +87,7 @@ int main(int argc, char *argv[])
 			{
 				robot.translate(iDynTree::Position(0.0, 0.1,0.0),
 						iDynTree::Position(0.0,-0.1,0.0),
-						2.0);
+						longTime);
 						
 				output.addString("Out");
 			}
@@ -106,13 +99,13 @@ int main(int argc, char *argv[])
 				iDynTree::Transform T2(iDynTree::Rotation::RPY(0,0,0.2),
 						       iDynTree::Position(0.3,-0.23,0.75));
 						       
-				robot.move_to_pose(T1,T2,2.0);
+				robot.move_to_pose(T1,T2,longTime);
 				
 				output.addString("Pronto");
 			}
 			else if(command == "receive")
 			{
-				robot.move_to_position(iDynTree::VectorDynSize(receive), 2.0);
+				robot.move_to_position(iDynTree::VectorDynSize(receive), shortTime);
 				
 				output.addString("Grazie");
 			}
@@ -120,13 +113,13 @@ int main(int argc, char *argv[])
 			{
 				robot.translate(iDynTree::Position(0.0,-0.1,0.0),
 						iDynTree::Position(0.0,-0.1,0.0),
-						2.0);
+						longTime);
 						
 				output.addString("Destra");
 			}
 			else if(command == "shake")
 			{
-				robot.move_to_position(iDynTree::VectorDynSize(shake), 2.0);
+				robot.move_to_position(iDynTree::VectorDynSize(shake), shortTime);
 				
 				output.addString("Piacere");
 			}
@@ -140,7 +133,7 @@ int main(int argc, char *argv[])
 				iDynTree::Transform T(iDynTree::Rotation::RPY(0,0,0),
 						      iDynTree::Position(0.3,0.2,0.8));
 						      
-				robot.move_to_pose(T, "l_hand", 2.0);
+				robot.move_to_pose(T, "left", longTime);
 				
 				output.addString("Testing");
 			}
@@ -148,13 +141,13 @@ int main(int argc, char *argv[])
 			{
 				robot.translate(iDynTree::Position(0.0, 0.0, 0.1),
 						iDynTree::Position(0.0, 0.0, 0.1),
-						2.0);
+						longTime);
 						
 				output.addString("Su");
 			}
 			else if(command == "wave")
 			{
-				robot.move_to_position(iDynTree::VectorDynSize(wave), 2.0);
+				robot.move_to_position(iDynTree::VectorDynSize(wave), shortTime);
 				
 				output.addString("Ciao");
 			}
