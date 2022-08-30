@@ -80,9 +80,8 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,
 		
 		return x0;
 	}
-	else	return solve_linear_system(f,H,x0);                                                 // Too easy, lol
+	else	return H.partialPivLu().solve(f);
 }
-
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //          Solve a constrained QP problem: min 0.5*x'*H*x - x'*f subject to: B*x >= c           //
@@ -159,7 +158,7 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,                       
 				
 				if(d[j] <= 0)
 				{
-					if(i == 0)
+					if(d[j] < 0 and i == 0)
 					{
 						std::cerr << "[ERROR] [QPSOLVER] solve(): "
 						          << "Start point x0 is outside the constraints!" << std::endl;
