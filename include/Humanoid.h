@@ -624,7 +624,7 @@ void Humanoid::run()
                 	get_acceleration_limits(lower, upper, i);
                 	z(i)           = -upper;                                                    // Maximum acceleration
                 	z(i+1*this->n) =  lower;                                                    // Minimum acceleration
-                	z(i+2*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Maximum torque
+                	z(i+2*this->n) = -this->tMax[i] - coriolisAndGravity(i);  // THIS IS WRONG  // Maximum torque
                 	z(i+3*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Minimum torque
    
 			redundant(i) = -2*this->qdot(i);
