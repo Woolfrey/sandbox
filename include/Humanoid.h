@@ -581,25 +581,14 @@ void Humanoid::run()
 			                                         elapsedTime);
 			feedback.tail(6) = blah;
 		}
-		else    feedback.tail(6).setZero();// = -2*J.block(6,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
-		
-		std::cout << "\nHere is the desired acceleration:\n" << std::endl;
-		std::cout << xddot << std::endl;
-		
-		std::cout << "\nHere is the feedback:\n" << std::endl;
-		std::cout << feedback << std::endl;
-		
-		// Resolve the dynamic coupling between the arms
-//		xddot  + J*M.inverse()*J.transpose()*feedback;
-		xddot += J*M.llt().solve(J.transpose()*feedback); 
-		
-		std::cout << "\nHere are the combined terms:\n" << std::endl;
-		std::cout << xddot << std::endl;
+		else    feedback.tail(6) = -2*J.block(6,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
 
+		xddot += J*M.llt().solve(J.transpose()*feedback);                                   // Resolve the dynamic coupling between arms
+		
 		// H = [ 0   J ]
 		//     [ J'  M ]
 		Eigen::MatrixXd H(m+this->n,m+this->n);
-		H.block(0,0,      m,      m).setZero();
+		H.block(0,0,      m,      m) = Eigen::MatrixXd::Zero(m,m);
 		H.block(0,m,      m,this->n) = J;
 		H.block(m,0,this->n,      m) = J.transpose();
 		H.block(m,m,this->n,this->n) = M;
@@ -607,15 +596,15 @@ void Humanoid::run()
 		// f = [ xddot - Jdot*qdot ]
 		//     [    redundant    ]
 		Eigen::VectorXd f(m+this->n);
-		f.head(m) = xddot - accBias;
-//		f.tail(this->n) = redundant; // NOTE: Redundant task computed in for-loop below
+		f.head(m) = accBias - xddot;                                                        // Need opposite sign for the QP solver
+//		f.tail(this->n) = -redundant; // NOTE: Redundant task computed in for-loop below
 
 		// B = [ 0 -I ]
 		//     [ 0  I ]
 		//     [ 0 -M ]
 		//     [ 0  M ]
 		Eigen::MatrixXd B(4*this->n,m+this->n);
-		B.block(        0,0,4*this->n,      m).setZero();
+		B.block(        0,0,4*this->n,      m) =  Eigen::MatrixXd::Zero(4*this->n,m);
 		B.block(        0,m,  this->n,this->n) = -Eigen::MatrixXd::Identity(this->n,this->n);
 		B.block(  this->n,m,  this->n,this->n) =  Eigen::MatrixXd::Identity(this->n,this->n);
 		B.block(2*this->n,m,  this->n,this->n) = -M;
@@ -626,6 +615,7 @@ void Humanoid::run()
 		//     [ -maxTau ]
 		//     [  minTau ]
 		Eigen::VectorXd z(4*this->n);
+		
 		Eigen::VectorXd redundant(this->n);
 		
 		for(int i = 0; i < this->n; i++)
@@ -637,15 +627,13 @@ void Humanoid::run()
                 	z(i+2*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Maximum torque
                 	z(i+3*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Minimum torque
    
-//  			redundant(i) = -0.1*this->qdot(i);             	
-	              	redundant(i) -(get_joint_penalty(i) + 2*this->qdot(i));                     // Redundant task
+			redundant(i) = -2*this->qdot(i);
                 	
                 	this->initialGuess(m+i) = 0.5*(lower+upper);                                 // Halfway?
                 }
                 
-                f.tail(this->n) = redundant;
+                f.tail(this->n) = -redundant;                                                       // We need opposite sign for the QP solver
                 
-//               this->initialGuess = solve(H,f,initialGuess);               
 		this->initialGuess = solve(H,f,B,z,initialGuess);
 	
 		
@@ -737,21 +725,11 @@ bool Humanoid::get_acceleration_limits(double &lower, double &upper, const int &
 	}
 	else
 	{
-/*
 		lower = std::max( 2*(this->pMin[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
 		                   -(this->vMax[jointNum] + this->qdot[jointNum])/this->dt );
 		
 		upper = std::min( 2*(this->pMax[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
 		                    (this->vMax[jointNum] - this->qdot[jointNum])/this->dt );
-*/
-
-		lower = std::max( 2*(this->pMin[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
-			std::max(  (-this->vMax[jointNum] - this->qdot[jointNum])/this->dt,
-			            -100.0));
-			            
-		upper = std::min( 2*(this->pMax[jointNum] - this->q[jointNum] - this->dt*qdot[jointNum])/(this->dt*this->dt),
-		        std::min(  (this->vMax[jointNum] - this->qdot[jointNum])/this->dt,
-		                    100.0));
 		                        
 	        return true;
 	}
@@ -766,13 +744,14 @@ double Humanoid::get_joint_penalty(const int &jointNum)
 	double lower = this->q(jointNum)    - this->pMin[jointNum];                                 // Distance from lower limit
 	double range = this->pMax[jointNum] - this->pMin[jointNum];                                 // Distance between limits
 	
+	// If on or outside constraint, set small, non-zero value
+	if(upper <= 0) upper = 1E-3;
+	if(lower <= 0) lower = 1E-6;
+	
 //      double penalty = range*range/(4*upper*lower);                                               // Penalty function, but only need derivative
 
 	double dpdq = (range*range*(2*this->q(jointNum)-this->pMax[jointNum]-this->pMin[jointNum])) // Derivative (i.e. gradient)
 	             /(4*upper*upper*lower*lower);
-
-	     if(dpdq >  1e03) dpdq =  1e03;
-	else if(dpdq < -1e03) dpdq = -1e03;
 	
 	return dpdq;
 }
