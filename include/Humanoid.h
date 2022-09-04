@@ -624,7 +624,7 @@ void Humanoid::run()
                 	get_acceleration_limits(lower, upper, i);
                 	z(i)           = -upper;                                                    // Maximum acceleration
                 	z(i+1*this->n) =  lower;                                                    // Minimum acceleration
-                	z(i+2*this->n) = -this->tMax[i] - coriolisAndGravity(i);  // THIS IS WRONG  // Maximum torque
+                	z(i+2*this->n) = -(this->tMax[i] - coriolisAndGravity(i));                  // -M*qddot >= -(tau - h)
                 	z(i+3*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Minimum torque
    
 			redundant(i) = -2*this->qdot(i);
@@ -636,6 +636,8 @@ void Humanoid::run()
                 
 		this->initialGuess = solve(H,f,B,z,initialGuess);
 	
+//		std::cout << "\nHere are the torques:\n" << std::endl;
+//		std::cout << M*this->initialGuess.tail(this->n) << std::endl;
 		
 		Eigen::VectorXd torqueControl = M*this->initialGuess.tail(this->n) + coriolisAndGravity;
 		
@@ -745,7 +747,7 @@ double Humanoid::get_joint_penalty(const int &jointNum)
 	double range = this->pMax[jointNum] - this->pMin[jointNum];                                 // Distance between limits
 	
 	// If on or outside constraint, set small, non-zero value
-	if(upper <= 0) upper = 1E-3;
+	if(upper <= 0) upper = 1E-6;
 	if(lower <= 0) lower = 1E-6;
 	
 //      double penalty = range*range/(4*upper*lower);                                               // Penalty function, but only need derivative
