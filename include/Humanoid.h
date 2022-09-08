@@ -76,8 +76,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		// Grasping related functions
 		
 		bool grasp_object(const iDynTree::Transform &left,
-		                  const iDynTree::Transform &right,
-		                  const iDynTree::Transform &object);
+		                  const iDynTree::Transform &right);
 
 	private:
 		double dt = 0.01;
@@ -93,10 +92,18 @@ class Humanoid : public yarp::os::PeriodicThread,
 		
 		// Cartesian control
 		bool leftControl, rightControl;                                                     // Switch for activating left and right control
-		CartesianTrajectory leftTrajectory, rightTrajectory;                                // Cartesian trajectories for each hand
+		CartesianTrajectory leftTrajectory, rightTrajectory;                                // Individual trajectories for left, right hand
 		Eigen::Matrix<double,6,6> K, D;                                                     // Cartesian stiffness and damping
 		
-		Eigen::VectorXd initialGuess;                                                       // Used in the QP solver
+		// Grasp control
+		CartesianTrajectory objectTrajectory;
+		Eigen::Matrix<double, 6, 6> Ao;
+		Eigen::Matrix<double,12, 6> C;                                                      // Constraint matrix
+		Eigen::Matrix<double, 6,12> G;                                                      // Grasp matrix
+		Eigen::Matrix<double,24, 6> Bc;                                                     // Constraint matrix for QP solver
+		Eigen::Matrix<double,24, 1> zc;                                                     // Constraint vector for QP solver
+		Eigen::Matrix<double,12, 1> fMin, fMax;                                             // Maximum and minimum grasping forces
+		
 		
 		// Kinematics & dynamics
 		iDynTree::FreeFloatingGeneralizedTorques generalForces;                             // Forces and torques		
@@ -104,6 +111,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		iDynTree::Transform                      torsoPose;                                 // Needed for inverse dynamics, but not used yet
 		iDynTree::Twist                          torsoTwist;                                // Needed for inverse dynamics, but not used yet
 		iDynTree::Vector3                        gravity;                                   // Needed for inverse dynamics, but not used yet
+		
 	
 		// Internal functions
 		
@@ -197,7 +205,6 @@ Humanoid::Humanoid(const std::string &fileName) :
 			this->qdot.resize(this->n);                                                 // Vector of joint velocities
 			this->qddot.resize(this->n);                                                // Vector of joint accelerations
 			this->tau.resize(this->n);                                                  // Vector of joint torques
-			this->initialGuess.resize(12+this->n);                                      // Used by QP solver
 
 			std::cout << "[INFO] [HUMANOID] Successfully created iDynTree model from " << fileName << "." << std::endl;
 
@@ -318,9 +325,6 @@ bool Humanoid::move_to_poses(const std::vector<iDynTree::Transform> &left,
 	waypoint.push_back(this->computer.getWorldTransform("right"));
 	waypoint.insert(waypoint.end(),right.begin(),right.end());
 	this->rightTrajectory = CartesianTrajectory(waypoint, times);
-	
-	// Set up the initial guess for the QP solver
-	this->initialGuess.setZero();
 	
 	start(); // Jump immediately to threadInit();
 	return true;
@@ -476,6 +480,92 @@ void Humanoid::halt()
 	move_to_position(this->q, 2.0);                                                             // Run control to stay at current configuration
 }
 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                      Grasp an object                                           //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool Humanoid::grasp_object(const iDynTree::Transform &left, const iDynTree::Transform &right)
+{
+	if(isRunning()) stop();                                                                     // Stop any control threads that are running
+	
+	// Set up spline to move hands to side of box
+	std::vector<iDynTree::Transform> leftWaypoints;                                             // Start at current hand pose
+	leftWaypoints.push_back(iDynTree::Transform(left.getRotation(),
+	                                            left.getPosition() + iDynTree::Position(0,0.05,0))); // Set waypoint off the side
+	leftWaypoints.push_back(left);                                                              // Finish at desired pose
+	
+	std::vector<iDynTree::Transform> rightWaypoints;
+	rightWaypoints.push_back(iDynTree::Transform(right.getRotation(),
+	                                             right.getPosition() - iDynTree::Position(0,0.05,0)));
+	rightWaypoints.push_back(right);
+	
+	// Set up waypoint times
+	std::vector<double> times;
+	times.push_back(2.5);
+	times.push_back(3.0);
+	
+	move_to_poses(leftWaypoints, rightWaypoints,times);
+	
+	// Wait for the action to be completed
+	float tick = yarp::os::Time::now();
+	do { /* nothing */}
+	while (yarp::os::Time::now() - tick <= times.back());
+	
+	// Set up the grasp and constraint matrices
+	iDynTree::Transform leftTransform  = this->computer.getWorldTransform("left");
+	iDynTree::Transform rightTransform = this->computer.getWorldTransform("right");
+	
+	iDynTree::Position midPoint = leftTransform.getPosition() + rightTransform.getPosition();
+	for(int i = 0; i < 3; i++) midPoint(i) *= 0.5;
+	
+	iDynTree::Position p = leftTransform.getPosition() - midPoint;
+	
+	// Left grasp matrix
+	Eigen::MatrixXd Gleft = Eigen::MatrixXd::Identity(6,6);
+	Gleft.block(3,0,3,3) <<    0, -p(2),  p(1),
+	                        p(2),     0, -p(0),
+	                       -p(1),  p(0),     0;
+	                 
+	// Right grasp matrix      
+	p = rightTransform.getPosition() - midPoint;
+	Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
+	Gright.block(3,0,3,3) <<    0, -p(2),  p(1),
+	                         p(2),     0, -p(0),
+	                        -p(1),  p(0),     0;
+	
+	// Composite grasp matrix
+	Eigen::MatrixXd G(6,12);
+	G.block(0,0,6,6) = Gleft;
+	G.block(0,6,6,6) = Gright;
+	
+	// Constraint matrix for hands
+	this->C.block(0,0,6,6) = Gleft.inverse();
+	this->C.block(6,0,6,6) =-Gright.inverse();
+	
+	// Constraint for QP solver
+	this->Bc.block( 0,0,12,6) =-this->C;
+	this->Bc.block(12,0,12,6) = this->C;
+	
+	// Constraint vector for QP solver
+	// Left hand:
+	this->fMin.block(0,0,6,1) << -10, -10, -10, -5, -5, -5;
+	this->fMax.block(0,0,6,1) <<  10,  -5,  10,  5,  5,  5;
+	
+	// Right hand:
+	this->fMin.block(6,0,6,1) << -10,   5, -10, -5, -5, -5;
+	this->fMax.block(6,0,6,1) <<  10,  10,  10,  5,  5,  5;
+	
+	this->zc.head(12) = -this->fMax;
+	this->zc.tail(12) =  this->fMin;
+	
+	// Mass-inertia matrix of the object
+	this->Ao.block(0,0,3,3) = 0.1*Eigen::MatrixXd::Identity(3,3);
+	this->Ao.block(3,3,3,3) << 1E-3,  0.0,  0.0, 
+	                            0.0, 1E-3,  0.0,
+	                            0.0,  0.0, 1E-3;
+	return true;
+	
+}
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////
  //                              This is executed just after 'start()' is called                  //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -526,17 +616,18 @@ void Humanoid::run()
 	}
 	else
 	{
-		int m = 12;
-		// Generate the Jacobian
-		Eigen::MatrixXd J(m,this->n);                                                       // Jacobian for both hands
-		Eigen::MatrixXd temp(6,6+this->n);                                                  // Jacobian for a single hand
+		//////////////////// Compute properties for all Cartesian control //////////////////
 		
-		this->computer.getFrameFreeFloatingJacobian("left", temp);                          // Get the full left hand Jacobian
-		J.block(0,0,6,this->n) = temp.block(0,6,6,this->n);                                 // Assign to the larger Jacobian
+		// Generate the Jacobian
+		Eigen::MatrixXd J(12,this->n);                                                      // Jacobian for both hands
+		Eigen::MatrixXd tempJ(6,6+this->n);                                                 // Jacobian for a single hand
+		
+		this->computer.getFrameFreeFloatingJacobian("left", tempJ);                         // Get the full left hand Jacobian
+		J.block(0,0,6,this->n) = tempJ.block(0,6,6,this->n);                                // Assign to the larger Jacobian
 		if(not this->leftControl) J.block(0,0,6,3).setZero();                               // Remove contribution of torso joints
 		
-		this->computer.getFrameFreeFloatingJacobian("right", temp);                         // Get the full right hand Jacobian
-		J.block(6,0,6,this->n) = temp.block(0,6,6,this->n);                                 // Assign the right hand Jacobian
+		this->computer.getFrameFreeFloatingJacobian("right", tempJ);                        // Get the full right hand Jacobian
+		J.block(6,0,6,this->n) = tempJ.block(0,6,6,this->n);                                // Assign the right hand Jacobian
 		if(not this->rightControl) J.block(6,0,6,3).setZero();                              // Remove contribution of torso joints
 		
 		Eigen::MatrixXd Jt = J.transpose();                                                 // Makes calcs a little easier later
@@ -546,6 +637,8 @@ void Humanoid::run()
 		this->computer.getFreeFloatingMassMatrix(M);                                        // Inertia including floating base
 		M = M.block(6,6,this->n,this->n);                                                   // Remove the floating base part
 		
+		Eigen::MatrixXd A = get_inverse(J*get_inverse(M)*Jt);                               // Cartesian inertia matrix (not ideal)
+		
 		// Compute the nonlinear accelerations and torques
 		Eigen::VectorXd accBias(12);                                                        // (dJ/dt)*(dq/dt)
 		accBias.block(0,0,6,1) = iDynTree::toEigen(this->computer.getFrameBiasAcc("left"));
@@ -554,95 +647,146 @@ void Humanoid::run()
 		this->computer.generalizedBiasForces(this->generalForces);			    // C*qdot + g
 		Eigen::VectorXd coriolisAndGravity = iDynTree::toEigen(this->generalForces.jointTorques());
 		
-		for(int i = 0; i < this->n; i++) controlInput(i) = coriolisAndGravity(i);
 		
-		// Solve the Cartesian control
-		Eigen::VectorXd xddot(12);                                                          // Acceleration of hands
-		Eigen::VectorXd	feedback(12);                                                       // Feedback control component
-		Eigen::VectorXd blah(6);                                                            // Temporary placeholder for feedback
+		////////////////////// Compute the relevant hand acceleration //////////////////////
 		
-		if(this->leftControl)
+		Eigen::Matrix<double,12,1> xddot;                                                   // Value to be computed
+		
+		if(this->controlMode == cartesian)
 		{
-			xddot.head(6) = get_feedforward_feedback(blah,                              
-		                                                 this->leftTrajectory,
-		                                                 this->computer.getWorldTransform("left"),
-		                                                 this->computer.getFrameVel("left"),
-		                                                 elapsedTime);
-		        feedback.head(6) = blah;                                                    // Assign feedback component to vector
-		}
-		else	feedback.head(6) = -2*J.block(0,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
-		
-		if(this->rightControl)
-		{
-			xddot.tail(6) = get_feedforward_feedback(blah,
-			                                         this->rightTrajectory,
-			                                         this->computer.getWorldTransform("right"),
-			                                         this->computer.getFrameVel("right"),
-			                                         elapsedTime);
-			feedback.tail(6) = blah;
-		}
-		else    feedback.tail(6) = -2*J.block(6,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
+			Eigen::VectorXd temp(6);
+			Eigen::VectorXd feedback(12);
+			
+			if(this->leftControl)
+			{
+				xddot.head(6) = get_feedforward_feedback(temp,                              
+				                                         this->leftTrajectory,
+				                                         this->computer.getWorldTransform("left"),
+				                                         this->computer.getFrameVel("left"),
+				                                         elapsedTime);
+				feedback.head(6) = temp;                                            // Assign feedback component to vector
+			}
+			else	feedback.head(6) = -2*J.block(0,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
+			
+			if(this->rightControl)
+			{
+				xddot.tail(6) = get_feedforward_feedback(temp,
+					                                 this->rightTrajectory,
+					                                 this->computer.getWorldTransform("right"),
+					                                 this->computer.getFrameVel("right"),
+					                                 elapsedTime);
+				feedback.tail(6) = temp;
+			}
+			else    feedback.tail(6) = -2*J.block(6,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
 
-		xddot += J*M.llt().solve(J.transpose()*feedback);                                   // Resolve the dynamic coupling between arms
+			// NOTE: llt().solve() fails when inertia is ill-conditioned
+			xddot += J*M.partialPivLu().solve(J.transpose()*feedback);                  // Resolve the dynamic coupling between arms
+		}
+		else // this->controlMode = grasp
+		{
+			Eigen::VectorXd feedback(6);
+			Eigen::VectorXd xddot = get_feedforward_feedback(feedback,
+			                                                 this->objectTrajectory,
+			                                                 this->computer.getWorldTransform("object"),
+			                                                 this->computer.getFrameVel("object"),
+			                                                 elapsedTime);
+			
+			xddot(2) += 9.81;                                                           // Need to accelerate up with gravity
+			Eigen::VectorXd force = this->Ao*xddot + feedback;                          // Sum all forces on object
+			
+			// Resolve dynamic coupling between object and arms
+			xddot = this->G.transpose()*((this->Ao + this->G*A*this->G.transpose()).partialPivLu().solve(force));
+		}
+		
+		//////////////////////////// Solve the Cartesian force control /////////////////////
+		
+		// Variables used for QP solver: min 0.5*x'*H*x subject to: B*z >= z
+		Eigen::MatrixXd H(12+this->n,12+this->n);                                           // Hessian for the QP solver
+		Eigen::VectorXd f(12+this->n);                                                      // Constant force the QP solver
+		Eigen::MatrixXd B(4*this->n,12+this->n);                                            // Constraint matrix for QP solver
+		Eigen::VectorXd z(4*this->n);                                                       // Constraint vector
+		Eigen::VectorXd redundant(this->n);
+		Eigen::VectorXd initialGuess(12+this->n); initialGuess.head(12) = A*(xddot - accBias);
 		
 		// H = [ 0   J ]
 		//     [ J'  M ]
-		Eigen::MatrixXd H(m+this->n,m+this->n);
-		H.block(0,0,      m,      m) = Eigen::MatrixXd::Zero(m,m);
-		H.block(0,m,      m,this->n) = J;
-		H.block(m,0,this->n,      m) = J.transpose();
-		H.block(m,m,this->n,this->n) = M;
+		H.block( 0, 0,     12,     12) = Eigen::MatrixXd::Zero(12,12);
+		H.block( 0,12,     12,this->n) = J;
+		H.block(12, 0,this->n,     12) = J.transpose();
+		H.block(12,12,this->n,this->n) = M;
 		
 		// f = [ xddot - Jdot*qdot ]
 		//     [    redundant    ]
-		Eigen::VectorXd f(m+this->n);
-		f.head(m) = accBias - xddot;                                                        // Need opposite sign for the QP solver
+		f.head(12) = accBias - xddot;                                                       // Need opposite sign for the QP solver
 //		f.tail(this->n) = -redundant; // NOTE: Redundant task computed in for-loop below
 
 		// B = [ 0 -I ]
 		//     [ 0  I ]
 		//     [ 0 -M ]
 		//     [ 0  M ]
-		Eigen::MatrixXd B(4*this->n,m+this->n);
-		B.block(        0,0,4*this->n,      m) =  Eigen::MatrixXd::Zero(4*this->n,m);
-		B.block(        0,m,  this->n,this->n) = -Eigen::MatrixXd::Identity(this->n,this->n);
-		B.block(  this->n,m,  this->n,this->n) =  Eigen::MatrixXd::Identity(this->n,this->n);
-		B.block(2*this->n,m,  this->n,this->n) = -M;
-		B.block(3*this->n,m,  this->n,this->n) =  M;
+		B.block(        0, 0,4*this->n,     12) =  Eigen::MatrixXd::Zero(4*this->n,12);
+		B.block(        0,12,  this->n,this->n) = -Eigen::MatrixXd::Identity(this->n,this->n);
+		B.block(  this->n,12,  this->n,this->n) =  Eigen::MatrixXd::Identity(this->n,this->n);
+		B.block(2*this->n,12,  this->n,this->n) = -M;
+		B.block(3*this->n,12,  this->n,this->n) =  M;
 		
 		// z = [ -maxAcc ]
 		//     [  minAcc ]
 		//     [ -maxTau ]
-		//     [  minTau ]
-		Eigen::VectorXd z(4*this->n);
-		
-		Eigen::VectorXd redundant(this->n);
-		
+		//     [  minTau ]		
 		for(int i = 0; i < this->n; i++)
-                {
-                	double lower, upper;
-                	get_acceleration_limits(lower, upper, i);
-                	z(i)           = -upper;                                                    // Maximum acceleration
-                	z(i+1*this->n) =  lower;                                                    // Minimum acceleration
-                	z(i+2*this->n) = -(this->tMax[i] - coriolisAndGravity(i));                  // -M*qddot >= -(tau - h)
-                	z(i+3*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Minimum torque
+	        {
+	        	double lower, upper;
+	        	get_acceleration_limits(lower, upper, i);
+	        	z(i)           = -upper;                                                    // Maximum acceleration
+	        	z(i+1*this->n) =  lower;                                                    // Minimum acceleration
+	        	z(i+2*this->n) = -(this->tMax[i] - coriolisAndGravity(i));                  // -M*qddot >= -(tau - h)
+	        	z(i+3*this->n) = -this->tMax[i] - coriolisAndGravity(i);                    // Minimum torque
    
 			redundant(i) = -2*this->qdot(i);
-                	
-                	this->initialGuess(m+i) = 0.5*(lower+upper);                                 // Halfway?
-                }
-                
-                f.tail(this->n) = -redundant;                                                       // We need opposite sign for the QP solver
-                
-		this->initialGuess = solve(H,f,B,z,initialGuess);
-	
-//		std::cout << "\nHere are the torques:\n" << std::endl;
-//		std::cout << M*this->initialGuess.tail(this->n) << std::endl;
+	        	
+	        	initialGuess(12+i) = 0.5*(lower+upper);                                     // Halfway?
+	        }
+	        f.tail(this->n) = -redundant;                                                       // We need opposite sign for the QP solver
+	        
+	        Eigen::VectorXd qddot = (solve(H,f,B,z,initialGuess)).tail(this->n);                // Find optimal joint accelerations
+	        
+	        Eigen::VectorXd torque = M*qddot;                                                   // Convert to joint torques
 		
-		Eigen::VectorXd torqueControl = M*this->initialGuess.tail(this->n) + coriolisAndGravity;
+		///////////////////// Project in to null space of grasping ////////////////////////
+		if(this->controlMode == grasp)
+		{
+			Eigen::MatrixXd Jc  = this->C.transpose()*J;
+			Eigen::MatrixXd Jct = Jc.transpose();
+			
+			//////////////////////// Solve the constraint forces ///////////////////////
+			Eigen::VectorXd fc_0(6); fc_0 << 0, 0, -6, 0, 0, 0;                         // Initial guess for forces
+			Eigen::VectorXd fc = solve(Jc*Jct,Eigen::VectorXd::Zero(6),Bc,zc,fc_0);     // Optimise the constraint forces
+			
+			/////////////////////  Solve for the projected control /////////////////////
+			H.resize(6+this->n,6+this->n);
+			f.resize(6+this->n);
+			initialGuess.resize(6+this->n);
+			
+			// H = [ 0   Jc ]
+			//     [ Jc' M  ]
+			H.block(0,0,      6,      6) = Eigen::MatrixXd::Zero(6,6);
+			H.block(0,6,      6,this->n) = Jc;
+			H.block(6,0,this->n,      6) = Jct;
+			H.block(6,6,this->n,this->n) = M;
+			
+			// f = [ Jcdot*qdot ]
+			//     [   -tau_n   ]
+			f.head(6)       = this->C.transpose()*accBias;                              // Jcdot*qdot
+			f.tail(this->n) = -torque;                                                  // Previous solution
+			
+			initialGuess.head(6)       = fc;                                            // Constraint forces
+			initialGuess.tail(this->n) = qddot;                                         // Use previous solution
+			
+			torque = M*(solve(H,f,B,z,initialGuess)).tail(this->n);
+		}
 		
-		for(int i = 0; i < this->n; i++) controlInput(i) = torqueControl(i);
-		
+		for(int i = 0; i < this->n; i++) controlInput(i) = torque(i) + coriolisAndGravity(i);  // Add on gravity, convert to iDynTree object
 	}
 	
 	send_torque_commands(controlInput);                                                         // Send the commands to the joint motors
@@ -706,8 +850,8 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 	{
 		error(i) = pos(i);
 		error(i+3) = 0.0;		
-//		if(angle < 2*M_PI) error(i+3) =  rot(i);
-//		else               error(i+3) = -rot(i);                                            // Angle > 180 degrees, spin other way
+		if(angle < 2*M_PI) error(i+3) =  rot(i);
+		else               error(i+3) = -rot(i);                                            // Angle > 180 degrees, spin other way
 	}
 	
 	return error;
@@ -745,10 +889,6 @@ double Humanoid::get_joint_penalty(const int &jointNum)
 	double upper = this->pMax[jointNum] - this->q(jointNum);                                    // Distance to upper limit
 	double lower = this->q(jointNum)    - this->pMin[jointNum];                                 // Distance from lower limit
 	double range = this->pMax[jointNum] - this->pMin[jointNum];                                 // Distance between limits
-	
-	// If on or outside constraint, set small, non-zero value
-	if(upper <= 0) upper = 1E-6;
-	if(lower <= 0) lower = 1E-6;
 	
 //      double penalty = range*range/(4*upper*lower);                                               // Penalty function, but only need derivative
 
