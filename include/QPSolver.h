@@ -81,7 +81,7 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,
 		
 		return x0;
 	}
-	else	return solve_linear_system(-f,H,x0);                                                // Too easy, lol
+	else	return H.partialPivLu().solve(-f);
 }
 
 
@@ -145,7 +145,7 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,                       
 			bt[j]  = B.row(j).transpose();                                              // Row vectors of B transposed
 			btb[j] = bt[j]*bt[j].transpose();                                           // Outer product of row vectors
 		}
-
+		
 		// Run the interior point method
 		for(int i = 0; i < this->steps; i++)
 		{
@@ -164,9 +164,6 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,                       
 					{
 						std::cerr << "[ERROR] [QPSOLVER] solve(): "
 						          << "Start point x0 is outside the constraints!" << std::endl;
-						          
-						std::cout << "\nHere is B*x0 - c:\n" << std::endl;
-						std::cout << B*x0 - c << std::endl;
 						
 						return x0;
 					}
