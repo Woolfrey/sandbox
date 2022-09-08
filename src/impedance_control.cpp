@@ -4,9 +4,9 @@
  //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <Humanoid.h>                                                                              // Custom robot control class
-#include <JointConfigurationsiCub3.h>                                                            // Pre-programmed configurations for iCub3
-#include <yarp/os/RpcServer.h>                                                                     // Ports for communicating with YARP
+#include <Humanoid.h>                                                                               // Custom robot control class
+#include <JointConfigurationsiCub3.h>                                                               // Pre-programmed configurations for iCub3
+#include <yarp/os/RpcServer.h>                                                                      // Ports for communicating with YARP
 
 double shortTime = 2.0;
 double longTime  = 5.0;
@@ -59,6 +59,32 @@ int main(int argc, char *argv[])
 			}
 			else if(command == "grasp")
 			{
+/*				std::vector<iDynTree::Transform> leftWaypoints;
+				std::vector<iDynTree::Transform> rightWaypoints;
+				
+				leftWaypoints.push_back(iDynTree::Transform(iDynTree::Rotation::RPY(0,0,0),
+				                                            iDynTree::Position(0.4,0.18,0.75)));
+				leftWaypoints.push_back(iDynTree::Transform(iDynTree::Rotation::RPY(0,0,0),
+				                                            iDynTree::Position(0.4,0.15,0.75)));
+				                                       
+				rightWaypoints.push_back(iDynTree::Transform(iDynTree::Rotation::RPY(0,0,0),
+				                                             iDynTree::Position(0.4,-0.18,0.75)));
+				rightWaypoints.push_back(iDynTree::Transform(iDynTree::Rotation::RPY(0,0,0),
+				                                             iDynTree::Position(0.4,-0.15,0.75)));				
+				
+				std::vector<double> times;
+				times.push_back(3.0);
+				times.push_back(3.5);	
+							
+				robot.move_to_poses(leftWaypoints,rightWaypoints,times);*/
+				
+				iDynTree::Transform leftPose(iDynTree::Rotation::RPY(0,0,0),
+				                             iDynTree::Position(0.38,0.15,0.75));
+				
+				iDynTree::Transform rightPose(iDynTree::Rotation::RPY(0,0,0),
+				                              iDynTree::Position(0.38,-0.16,0.75));
+				                              
+				robot.grasp_object(leftPose,rightPose);
 				
 				output.addString("Grasping");
 			}			
