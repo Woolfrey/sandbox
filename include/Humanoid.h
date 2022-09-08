@@ -103,6 +103,7 @@ class Humanoid : public yarp::os::PeriodicThread,
 		Eigen::Matrix<double,24, 6> Bc;                                                     // Constraint matrix for QP solver
 		Eigen::Matrix<double,24, 1> zc;                                                     // Constraint vector for QP solver
 		Eigen::Matrix<double,12, 1> fMin, fMax;                                             // Maximum and minimum grasping forces
+		iDynTree::Transform leftHandOffset;                                                 // Offset of object from left hand
 		
 		
 		// Kinematics & dynamics
@@ -112,7 +113,6 @@ class Humanoid : public yarp::os::PeriodicThread,
 		iDynTree::Twist                          torsoTwist;                                // Needed for inverse dynamics, but not used yet
 		iDynTree::Vector3                        gravity;                                   // Needed for inverse dynamics, but not used yet
 		
-	
 		// Internal functions
 		
 		bool get_acceleration_limits(double &lower, double &upper, const int &jointNum);
@@ -183,10 +183,10 @@ Humanoid::Humanoid(const std::string &fileName) :
 		iDynTree::Model temp = loader.model();
 		temp.addAdditionalFrameToLink("l_hand", "left",
 					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0.0),
-								  iDynTree::Position(0,0,-0.04)));
+								  iDynTree::Position(0,0,-0.06	)));
 		temp.addAdditionalFrameToLink("r_hand", "right",
 					      iDynTree::Transform(iDynTree::Rotation::RPY(0,M_PI/2,0.0),
-					      			  iDynTree::Position(0,0,-0.04)));
+					      			  iDynTree::Position(0,0,-0.06)));
 									    
 		if(not this->computer.loadRobotModel(temp))
 		{
@@ -388,8 +388,7 @@ bool Humanoid::move_to_positions(const std::vector<iDynTree::VectorDynSize> &pos
 	}
 	
 	if(allGood)
-	{
-		
+	{	
 		start();
 		return true;
 	}
@@ -487,6 +486,8 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left, const iDynTree::Tra
 {
 	if(isRunning()) stop();                                                                     // Stop any control threads that are running
 	
+	////////////////////////////////// Move hands to the object ////////////////////////////////
+	
 	// Set up spline to move hands to side of box
 	std::vector<iDynTree::Transform> leftWaypoints;                                             // Start at current hand pose
 	leftWaypoints.push_back(iDynTree::Transform(left.getRotation(),
@@ -503,39 +504,42 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left, const iDynTree::Tra
 	times.push_back(2.5);
 	times.push_back(3.0);
 	
-	move_to_poses(leftWaypoints, rightWaypoints,times);
+	move_to_poses(leftWaypoints, rightWaypoints,times);                                         // Move the hands in to position
 	
 	// Wait for the action to be completed
-	float tick = yarp::os::Time::now();
-	do { /* nothing */}
-	while (yarp::os::Time::now() - tick <= times.back());
+	double tick = yarp::os::Time::now();
+	while(yarp::os::Time::now() - tick < 4.0); // Do nothing
+	
+	//////////////////////////////// Set up the grasp properties ///////////////////////////////
 	
 	// Set up the grasp and constraint matrices
 	iDynTree::Transform leftTransform  = this->computer.getWorldTransform("left");
 	iDynTree::Transform rightTransform = this->computer.getWorldTransform("right");
 	
+	// Compute the halfway point between the hands
 	iDynTree::Position midPoint = leftTransform.getPosition() + rightTransform.getPosition();
 	for(int i = 0; i < 3; i++) midPoint(i) *= 0.5;
 	
-	iDynTree::Position p = leftTransform.getPosition() - midPoint;
-	
+	this->leftHandOffset = iDynTree::Transform(iDynTree::Rotation::RPY(0,0,0),                  // Assume same orientation as left hand
+	                                           midPoint - leftTransform.getPosition());         
+
 	// Left grasp matrix
+	iDynTree::Position p = leftTransform.getPosition() - midPoint;                              // Translation from midpoint to left hand
 	Eigen::MatrixXd Gleft = Eigen::MatrixXd::Identity(6,6);
 	Gleft.block(3,0,3,3) <<    0, -p(2),  p(1),
 	                        p(2),     0, -p(0),
 	                       -p(1),  p(0),     0;
 	                 
 	// Right grasp matrix      
-	p = rightTransform.getPosition() - midPoint;
+	p = rightTransform.getPosition() - midPoint;                                                // Translation from midpoint to right hand
 	Eigen::MatrixXd Gright = Eigen::MatrixXd::Identity(6,6);
 	Gright.block(3,0,3,3) <<    0, -p(2),  p(1),
 	                         p(2),     0, -p(0),
 	                        -p(1),  p(0),     0;
 	
 	// Composite grasp matrix
-	Eigen::MatrixXd G(6,12);
-	G.block(0,0,6,6) = Gleft;
-	G.block(0,6,6,6) = Gright;
+	this->G.block(0,0,6,6) = Gleft;
+	this->G.block(0,6,6,6) = Gright;
 	
 	// Constraint matrix for hands
 	this->C.block(0,0,6,6) = Gleft.inverse();
@@ -547,23 +551,38 @@ bool Humanoid::grasp_object(const iDynTree::Transform &left, const iDynTree::Tra
 	
 	// Constraint vector for QP solver
 	// Left hand:
-	this->fMin.block(0,0,6,1) << -10, -10, -10, -5, -5, -5;
-	this->fMax.block(0,0,6,1) <<  10,  -5,  10,  5,  5,  5;
+	this->fMin.block(0,0,6,1) << -10, -10, -10, -0.1, -0.1, -0.1;
+	this->fMax.block(0,0,6,1) <<  10,  -5,  10,  0.1,  0.1,  0.1;
 	
 	// Right hand:
-	this->fMin.block(6,0,6,1) << -10,   5, -10, -5, -5, -5;
-	this->fMax.block(6,0,6,1) <<  10,  10,  10,  5,  5,  5;
+	this->fMin.block(6,0,6,1) << -10,   5, -10, -0.1, -0.1, -0.1;
+	this->fMax.block(6,0,6,1) <<  10,  10,  10,  0.1,  0.1,  0.1;
 	
 	this->zc.head(12) = -this->fMax;
 	this->zc.tail(12) =  this->fMin;
 	
 	// Mass-inertia matrix of the object
 	this->Ao.block(0,0,3,3) = 0.1*Eigen::MatrixXd::Identity(3,3);
-	this->Ao.block(3,3,3,3) << 1E-3,  0.0,  0.0, 
-	                            0.0, 1E-3,  0.0,
-	                            0.0,  0.0, 1E-3;
-	return true;
+	this->Ao.block(3,3,3,3) << 1.6E-4,    0.0,    0.0, 
+	                              0.0, 1.6E-4,    0.0,
+	                              0.0,    0.0, 2.7E-4;
 	
+	////////////////////////////// Set up object trajectory and run control ////////////////////
+	std::vector<iDynTree::Transform> waypoints;
+	iDynTree::VectorDynSize t(2);
+	
+	iDynTree::Transform objectTransform = leftTransform*this->leftHandOffset;
+	
+	waypoints.push_back(objectTransform);
+	t(0) = 0;
+	waypoints.push_back(objectTransform);
+	t(1) = 3;
+	
+	this->objectTrajectory = CartesianTrajectory(waypoints,t);
+	
+	this->controlMode = grasp;
+	
+	return true;
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -616,6 +635,8 @@ void Humanoid::run()
 	}
 	else
 	{
+		//if(this->controlMode == cartesian)  std::cout << "\nCartesian control mode.\n" << std::endl;
+		//else if(this->controlMode == grasp) std::cout << "\nGrasp control mode.\n" << std::endl; 
 		//////////////////// Compute properties for all Cartesian control //////////////////
 		
 		// Generate the Jacobian
@@ -637,7 +658,10 @@ void Humanoid::run()
 		this->computer.getFreeFloatingMassMatrix(M);                                        // Inertia including floating base
 		M = M.block(6,6,this->n,this->n);                                                   // Remove the floating base part
 		
-		Eigen::MatrixXd A = get_inverse(J*get_inverse(M)*Jt);                               // Cartesian inertia matrix (not ideal)
+		Eigen::PartialPivLU<Eigen::MatrixXd> Mlu(M);                                        // We will use this to invert M later
+		
+		Eigen::MatrixXd A = (J*Mlu.inverse()*Jt).partialPivLu().inverse();                  // Get the inverse
+		
 		
 		// Compute the nonlinear accelerations and torques
 		Eigen::VectorXd accBias(12);                                                        // (dJ/dt)*(dq/dt)
@@ -647,11 +671,10 @@ void Humanoid::run()
 		this->computer.generalizedBiasForces(this->generalForces);			    // C*qdot + g
 		Eigen::VectorXd coriolisAndGravity = iDynTree::toEigen(this->generalForces.jointTorques());
 		
-		
 		////////////////////// Compute the relevant hand acceleration //////////////////////
 		
 		Eigen::Matrix<double,12,1> xddot;                                                   // Value to be computed
-		
+		xddot.setZero();
 		if(this->controlMode == cartesian)
 		{
 			Eigen::VectorXd temp(6);
@@ -679,16 +702,19 @@ void Humanoid::run()
 			}
 			else    feedback.tail(6) = -2*J.block(6,0,6,this->n)*iDynTree::toEigen(this->qdot); // Slow down the hand
 
-			// NOTE: llt().solve() fails when inertia is ill-conditioned
-			xddot += J*M.partialPivLu().solve(J.transpose()*feedback);                  // Resolve the dynamic coupling between arms
+			xddot += J*Mlu.solve(J.transpose()*feedback);
 		}
 		else // this->controlMode = grasp
 		{
+			iDynTree::Transform objectTF = this->computer.getWorldTransform("left")*this->leftHandOffset; // Pose of object
+	
+			iDynTree::Twist objectVel = this->leftHandOffset.getPosition()*this->computer.getFrameVel("left");
+			
 			Eigen::VectorXd feedback(6);
 			Eigen::VectorXd xddot = get_feedforward_feedback(feedback,
 			                                                 this->objectTrajectory,
-			                                                 this->computer.getWorldTransform("object"),
-			                                                 this->computer.getFrameVel("object"),
+									 objectTF,
+			                                                 objectVel,
 			                                                 elapsedTime);
 			
 			xddot(2) += 9.81;                                                           // Need to accelerate up with gravity
@@ -696,6 +722,7 @@ void Humanoid::run()
 			
 			// Resolve dynamic coupling between object and arms
 			xddot = this->G.transpose()*((this->Ao + this->G*A*this->G.transpose()).partialPivLu().solve(force));
+			
 		}
 		
 		//////////////////////////// Solve the Cartesian force control /////////////////////
@@ -760,9 +787,9 @@ void Humanoid::run()
 			Eigen::MatrixXd Jct = Jc.transpose();
 			
 			//////////////////////// Solve the constraint forces ///////////////////////
-			Eigen::VectorXd fc_0(6); fc_0 << 0, 0, -6, 0, 0, 0;                         // Initial guess for forces
-			Eigen::VectorXd fc = solve(Jc*Jct,Eigen::VectorXd::Zero(6),Bc,zc,fc_0);     // Optimise the constraint forces
-			
+			Eigen::VectorXd fc_0(6); fc_0 << 0, -6, 0, 0, 0, 0;                         // Initial guess for forces
+			Eigen::VectorXd fc = solve(Jc*Jct,Eigen::VectorXd::Zero(6),Bc,zc,fc_0);     // Optimise the constraint force
+
 			/////////////////////  Solve for the projected control /////////////////////
 			H.resize(6+this->n,6+this->n);
 			f.resize(6+this->n);
@@ -780,10 +807,28 @@ void Humanoid::run()
 			f.head(6)       = this->C.transpose()*accBias;                              // Jcdot*qdot
 			f.tail(this->n) = -torque;                                                  // Previous solution
 			
-			initialGuess.head(6)       = fc;                                            // Constraint forces
-			initialGuess.tail(this->n) = qddot;                                         // Use previous solution
+			B = B.block(0,6,4*this->n,6+this->n);
+			
+			initialGuess.head(6) = fc;                                                  // Constraint forces
+			initialGuess.tail(this->n) = qddot;
+			
+			for(int i = 0; i < this->n; i++)
+			{
+				double lower, upper;
+				get_acceleration_limits(lower,upper,i);
+				if(qddot(i) <= lower or qddot(i) >= upper)
+				{
+					std::cout << "i: " <<  lower << " " << qddot(i) << " " << upper << std::endl;
+				}
+				else if(torque(i) <= -this->tMax[i] or torque(i) >= this->tMax[i])
+				{
+					std::cout << "i: " << -this->tMax[i] << torque(i) << " " << this->tMax[i] << std::endl;
+				}
+			}
 			
 			torque = M*(solve(H,f,B,z,initialGuess)).tail(this->n);
+			
+			torque += Jct*fc;
 		}
 		
 		for(int i = 0; i < this->n; i++) controlInput(i) = torque(i) + coriolisAndGravity(i);  // Add on gravity, convert to iDynTree object
@@ -844,12 +889,10 @@ iDynTree::Vector6 Humanoid::get_pose_error(const iDynTree::Transform &desired,
 	
 	double angle = 2*sqrt(rot(0)*rot(0) + rot(1)*rot(1) + rot(2)*rot(2));                       // Get angle of rotation
 	
-	
 	iDynTree::Vector6 error;
 	for(int i = 0; i < 3; i++)
 	{
 		error(i) = pos(i);
-		error(i+3) = 0.0;		
 		if(angle < 2*M_PI) error(i+3) =  rot(i);
 		else               error(i+3) = -rot(i);                                            // Angle > 180 degrees, spin other way
 	}
