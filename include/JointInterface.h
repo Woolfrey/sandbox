@@ -295,6 +295,9 @@ bool JointInterface::read_encoders()
 		// Ensure values are always within limits to avoid problems with avoidance functions
 		     if(this->pos[i] < this->pMin[i]) this->pos[i] = this->pMin[i];
 		else if(this->pos[i] > this->pMax[i]) this->pos[i] = this->pMax[i];
+		
+//		     if(this->vel[i] <-this->vMax[i]) this->vel[i] =-this->vMax[i];
+//		else if(this->vel[i] > this->vMax[i]) this->vel[i] = this->vMax[i];
 	}
 
 	if(not success) std::cerr << "[ERROR] [JOINT INTERFACE] read_encoders(): "
