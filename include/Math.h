@@ -217,6 +217,9 @@ Eigen::MatrixXd get_cholesky_inverse(const Eigen::MatrixXd &A)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 Eigen::MatrixXd get_inverse(const Eigen::MatrixXd &A)
 {
+	std::cerr << "[ERROR] get_inverse(): This function needs reprogramming." << std::endl;
+	return Eigen::MatrixXd::Zero(A.cols(),A.rows());
+/*
 	int n = A.rows();
 	if(A.cols() != n)
 	{
@@ -236,6 +239,7 @@ Eigen::MatrixXd get_inverse(const Eigen::MatrixXd &A)
 		}
 		else    return Eigen::MatrixXd::Zero(n,n);
 	}
+*/
 }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
