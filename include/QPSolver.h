@@ -1,7 +1,8 @@
 #ifndef QPSOLVER_H_
 #define QPSOLVER_H_
 
-#include <Math.h>                                                                                    // Required for QR Decomposition
+#include <math.h>
+#include <Math.h>
 #include <vector>                                                                                    // std::vector
 
 class QPSolver
@@ -163,6 +164,10 @@ Eigen::VectorXd QPSolver::solve(const Eigen::MatrixXd &H,                       
 					{
 						std::cerr << "[ERROR] [QPSOLVER] solve(): "
 						          << "Start point x0 is outside the constraints!" << std::endl;
+						          
+						std::cout << "\nHere is B*x0 - c:\n" << std::endl;
+						std::cout << B*x0 - c << std::endl;
+						
 						return x0;
 					}
 			
