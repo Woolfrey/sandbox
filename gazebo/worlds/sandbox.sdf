@@ -2,9 +2,9 @@
 <sdf version="1.7">
 	<world name="default">
 	
-		<physics default="1" name="custom_physics" type="ode">
-			<real_time_update_rate>500.0</real_time_update_rate>
-			<max_contacts>5</max_contacts>
+		<physics default="1" name="custom_physics" type="dart">
+			<real_time_update_rate>1000.0</real_time_update_rate>
+			<max_contacts>100</max_contacts>
 			<max_step_size>0.001</max_step_size>
 			<real_time_factor>1.0</real_time_factor>
 		</physics>
@@ -26,7 +26,7 @@
 		
 		<model name="iCub">
 			<include>
-				<uri>model://iCubGazeboV3</uri>
+				<uri>model://iCubGazeboV3_visuomanip</uri>
 				<pose>0.0 0.0 0.64 0.0 0.0 0.0</pose>
 			</include>
 		</model>

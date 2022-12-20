@@ -254,8 +254,8 @@ int main(int argc, char *argv[])
 	home[5] = 00.0;
 	home[6] = 00.0;
 	
-	left_arm.setTarget(home,2.0);								// Assign new control target
-	right_arm.setTarget(home,2.0);						
+//	left_arm.setTarget(home,2.0);								// Assign new control target
+//	right_arm.setTarget(home,2.0);						
 	double start = yarp::os::Time::now();
 	double elapsed_time;
 	bool complete = false;

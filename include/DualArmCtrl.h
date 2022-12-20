@@ -43,6 +43,8 @@ class DualArmCtrl : public yarp::os::PeriodicThread
 		ArmCtrl leftArm, rightArm;				// Handles kinematics for the arms
 		JointCtrl torso;					// Handles joint communication and control for torso
 		
+		yarp::sig::Matrix leftSetPoint, rightSetPoint;
+		
 		// Control thread functions
 		bool threadInit();					// Executed after start() and before run()
 		void run();						// Main control loop
@@ -193,14 +195,16 @@ void DualArmCtrl::translate(const yarp::sig::Vector &left, const yarp::sig::Vect
 	// Offset the left hand by the given amount
 	if(left.size() == 3)
 	{
-		TL = this->leftArm.get_pose();					// Get the pose of the left hand
+//		TL = this->leftArm.get_pose();					// Get the pose of the left hand
+		TL = this->leftSetPoint;
 		for(int i = 0; i < 3; i++) TL[i][3] += left[i];			// Add the translation
 	}
 
 	// Offset the right hand by the given amount
 	if(right.size() == 3)
 	{
-		TR = this->rightArm.get_pose();					// Get the pose of the right hand
+//		TR = this->rightArm.get_pose();					// Get the pose of the right hand
+		TR = this->rightSetPoint;
 		for(int i = 0; i < 3; i++) TR[i][3] += right[i];		// Add the translation
 	}
 	
@@ -234,8 +238,16 @@ void DualArmCtrl::move_to_pose(const yarp::sig::Matrix &left, const yarp::sig::M
 		this->controlSpace = 2;						// Switch case for control
 		
 		// Generate new Cartesian space trajectories internally
-		if(this->leftControl)	this->leftArm.set_cartesian_trajectory(left, 3.0);
-		if(this->rightControl)	this->rightArm.set_cartesian_trajectory(right, 3.0);
+		if(this->leftControl)
+		{
+			this->leftSetPoint = left;
+			this->leftArm.set_cartesian_trajectory(left, 3.0);
+		}
+		if(this->rightControl)
+		{
+			this->rightSetPoint = right;
+			this->rightArm.set_cartesian_trajectory(right, 3.0);
+		}
 		
 		start(); // Go immediately to threadInit()
 	}

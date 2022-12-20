@@ -5,7 +5,7 @@
 yarp::sig::Matrix RL = yarp::math::rpy2dcm(yarp::sig::Vector({-1.15*M_PI/2, 0.0,-0.0}));	// Keeps the palms vertical
 yarp::sig::Matrix RR = yarp::math::rpy2dcm(yarp::sig::Vector({-0.85*M_PI/2, 0.0, 0.0}));	// Keep the palms vertical
 yarp::sig::Vector armHome({-30, 30,  00,  45,  00,  00,  0});
-yarp::sig::Vector graspPos({0.4, 0.19, 0.63});
+yarp::sig::Vector graspPos({0.33, 0.20, 0.66});
 yarp::sig::Vector receive( {-50, 10,  00,  40, -60,  20, 10});
 yarp::sig::Vector shake(   {-50, 40,  65,  45, -70, -20,  0});
 yarp::sig::Vector torsoHome({0.0, 0.0, 0.0});
@@ -99,8 +99,8 @@ int main(int argc, char *argv[])
 		else if(command == "left")					// Move both hands left
 		{
 			output.addString("Sinistra");
-			controller.translate(	yarp::sig::Vector({ 0.0, 0.1, 0.0}),
-						yarp::sig::Vector({ 0.0, 0.1, 0.0}));
+			controller.translate(	yarp::sig::Vector({ 0.0, 0.05, 0.0}),
+						yarp::sig::Vector({ 0.0, 0.05, 0.0}));
 		}
 		else if(command == "left hand pose")				// Print the pose of the left hand
 		{
@@ -131,8 +131,8 @@ int main(int argc, char *argv[])
 		else if(command == "right")
 		{
 			output.addString("Destra");
-			controller.translate(	yarp::sig::Vector({ 0.0,-0.1, 0.0}),
-						yarp::sig::Vector({ 0.0,-0.1, 0.0}));
+			controller.translate(	yarp::sig::Vector({ 0.0,-0.05, 0.0}),
+						yarp::sig::Vector({ 0.0,-0.05, 0.0}));
 		}
 		else if(command == "right hand pose")				// Print the pose of the right hand		
 		{
